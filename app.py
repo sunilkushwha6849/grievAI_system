@@ -272,16 +272,17 @@ def send_otp():
     if not email:
         return jsonify({'success': False, 'message': 'Email is required'})
     
+    # Check if email already exists and verified
     conn = get_db()
-    user = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
+    existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
+    
+    if existing and existing['is_verified'] == 1:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Email already registered and verified! Please login.'})
+    
     conn.close()
     
-    if not user:
-        return jsonify({'success': False, 'message': 'Email not registered!'})
-    
-    if user['is_verified'] == 1:
-        return jsonify({'success': False, 'message': 'Email already verified! Please login.'})
-    
+    # Generate OTP - even if email not registered yet
     otp = generate_otp()
     OTP_STORE[email] = {
         'otp': otp,
@@ -291,13 +292,12 @@ def send_otp():
     send_otp_email(email, otp)
     
     print(f"\n{'='*40}")
-    print(f"[OTP] {email} => {otp}")
+    print(f"[OTP] New registration for {email} => {otp}")
     print(f"{'='*40}\n")
     
-    return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent successfully!'})
-
-# ==============================================
-# API: VERIFY OTP
+    return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent successfully! Please verify to complete registration.'})
+    # ==============================================
+# API: VERIFY OTP (FOR REGISTRATION)
 # ==============================================
 
 @app.route('/api/verify-otp', methods=['POST'])
@@ -321,15 +321,8 @@ def verify_otp():
     if stored['otp'] != otp:
         return jsonify({'success': False, 'message': 'Invalid OTP!'})
     
-    conn = get_db()
-    conn.execute('UPDATE citizens SET is_verified = 1 WHERE email = ?', (email,))
-    conn.commit()
-    conn.close()
-    
-    del OTP_STORE[email]
-    
-    return jsonify({'success': True, 'message': 'OTP verified successfully!'})
-
+    # OTP is valid - don't mark verified yet, just return success
+    return jsonify({'success': True, 'message': 'OTP verified! You can now complete registration.'})
 # ==============================================
 # API: CITIZEN REGISTER
 # ==============================================
