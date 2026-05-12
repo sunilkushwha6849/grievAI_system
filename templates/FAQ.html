@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FAQ – GrievAI मध्य प्रदेश</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+.faq-page { min-height:100vh; background: linear-gradient(135deg, #F4F6FB 0%, #E8EFF8 100%); }
+.faq-header { background: linear-gradient(135deg, #0E4D2F 0%, #1B8A4E 50%, #0E6B6B 100%); padding: 2rem; color: #fff; text-align: center; }
+.faq-header h1 { font-family: 'Baloo 2', sans-serif; font-size: 36px; margin-bottom: 10px; }
+.faq-header p { opacity: 0.9; }
+.faq-container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+.faq-search { margin-bottom: 2rem; }
+.faq-search input { width: 100%; padding: 14px 20px; border: 2px solid #E2E8F0; border-radius: 50px; font-size: 16px; }
+.faq-search input:focus { outline: none; border-color: #1B8A4E; }
+.faq-categories { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 2rem; }
+.cat-btn { padding: 8px 20px; border: none; border-radius: 30px; background: #fff; cursor: pointer; font-weight: 500; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.cat-btn.active { background: #1B8A4E; color: #fff; }
+.cat-btn:hover { background: #1B8A4E; color: #fff; }
+.faq-item { background: #fff; border-radius: 16px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: all 0.2s; }
+.faq-question { padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; color: #1A202C; }
+.faq-question:hover { background: #F7FAFF; }
+.faq-question .icon { font-size: 22px; color: #1B8A4E; transition: transform 0.2s; }
+.faq-answer { padding: 0 22px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; background: #F9FAFB; color: #4A5568; line-height: 1.6; border-top: 1px solid #E2E8F0; }
+.faq-item.open .faq-answer { padding: 30px 22px; max-height: 300px; }
+.faq-item.open .faq-question .icon { transform: rotate(45deg); }
+.back-home { position: fixed; bottom: 20px; left:20px; background: #1B8A4E; color: #fff; padding: 16px 28px; border-radius: 50px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.2s; }
+.back-home:hover { background: #0E6B6B; transform: scale(1.02); }
+.no-results { text-align: center; padding: 40px; color: #718096; }
+</style>
+</head>
+<body>
+<div class="faq-page">
+  <div class="faq-header">
+    <h1>❓ अक्सर पूछे जाने वाले प्रश्न</h1>
+    <p>GrievAI पोर्टल के बारे में सामान्य प्रश्न और उनके उत्तर</p>
+  </div>
+
+  <div class="faq-container">
+    <div class="faq-search">
+      <input type="text" id="searchInput" placeholder="🔍 प्रश्न खोजें... (FAQ में खोजें)">
+    </div>
+
+    <div class="faq-categories">
+      <button class="cat-btn active" data-cat="all">सभी</button>
+      <button class="cat-btn" data-cat="complaint">शिकायत</button>
+      <button class="cat-btn" data-cat="account">अकाउंट</button>
+      <button class="cat-btn" data-cat="technical">तकनीकी</button>
+      <button class="cat-btn" data-cat="department">विभाग</button>
+    </div>
+
+    <div id="faqList"></div>
+  </div>
+
+  <a href="/" class="back-home">🏠 होम पेज पर वापस</a>
+</div>
+
+<script src="/static/js/chatbot.js"></script>
+<script>
+const faqData = [
+  { id: 1, category: "complaint", question: "शिकायत कैसे दर्ज करें?", answer: "Citizen Portal में लॉगिन करें, 'नई शिकायत' टैब पर जाएं, सभी जानकारी भरें (नाम, शहर, विभाग, शिकायत विवरण), लोकेशन लेना अनिवार्य है, फिर 'शिकायत दर्ज करें' बटन पर क्लिक करें।" },
+  { id: 2, category: "complaint", question: "शिकायत का स्टेटस कैसे देखें?", answer: "Citizen Dashboard में 'मेरी शिकायतें' टैब पर जाएं। वहां आपको सभी शिकायतों की स्थिति (लंबित/हल) दिखाई देगी।" },
+  { id: 3, category: "complaint", question: "क्या मैं वॉइस से शिकायत दर्ज कर सकता हूं?", answer: "हां! 'नई शिकायत' में 'बोलें' बटन पर क्लिक करें, रिकॉर्डिंग शुरू करें और अपनी शिकायत बोलें। रिकॉर्डिंग बंद करने के बाद आप सुन सकते हैं।" },
+  { id: 4, category: "complaint", question: "क्या फोटो अटैच कर सकते हैं?", answer: "हां, 'फोटो' बटन पर क्लिक करके आप शिकायत के साथ फोटो अपलोड कर सकते हैं। फोटो प्रीव्यू भी देख सकते हैं।" },
+  { id: 5, category: "complaint", question: "शिकायत का समाधान होने में कितना समय लगता है?", answer: "साधारण शिकायतें 3-5 दिनों में, जटिल शिकायतें 7-10 दिनों में, और सभी शिकायतें अधिकतम 15 दिनों में समाधान कर दी जाती हैं।" },
+  { id: 6, category: "complaint", question: "लोकेशन क्यों लेना जरूरी है?", answer: "लोकेशन से हमें आपकी समस्या के सटीक स्थान का पता चलता है, जिससे संबंधित विभाग तुरंत कार्रवाई कर पाता है। यह समाधान की प्रक्रिया को तेज करता है।" },
+  { id: 7, category: "account", question: "पासवर्ड भूल गए तो क्या करें?", answer: "लॉगिन पेज पर 'पासवर्ड भूल गए?' लिंक पर क्लिक करें, अपना पंजीकृत Email दर्ज करें, OTP वेरिफिकेशन के बाद नया पासवर्ड सेट करें।" },
+  { id: 8, category: "account", question: "क्या मैं अपना Email बदल सकता हूं?", answer: "नहीं, सुरक्षा कारणों से Email, मोबाइल नंबर और ID बदलने की सुविधा उपलब्ध नहीं है। कृपया रजिस्ट्रेशन के समय सही जानकारी दें।" },
+  { id: 9, category: "account", question: "अकाउंट कैसे डिलीट करें?", answer: "अकाउंट डिलीट करने के लिए admin@grievai.com पर ईमेल करें या टोल फ्री नंबर पर कॉल करें।" },
+  { id: 10, category: "technical", question: "AI चैटबॉट का उपयोग कैसे करें?", answer: "हर पेज के नीचे दाईं तरफ चैटबॉट आइकन है। उस पर क्लिक करें और अपना प्रश्न लिखें या बोलें। चैटबॉट आपको तुरंत जवाब देगा।" },
+  { id: 11, category: "technical", question: "मोबाइल पर पोर्टल कैसे उपयोग करें?", answer: "पोर्टल मोबाइल फ्रेंडली है। आप किसी भी मोबाइल ब्राउजर से http://localhost:5000 पर जाकर उपयोग कर सकते हैं।" },
+  { id: 12, category: "technical", question: "ब्राउजर में लोकेशन एक्सेस नहीं करने दे रहा?", answer: "ब्राउजर सेटिंग्स में जाकर लोकेशन परमिशन दें या दूसरे ब्राउजर (Chrome, Firefox) का उपयोग करें।" },
+  { id: 13, category: "department", question: "विभाग कैसे रजिस्टर करें?", answer: "Department Portal में 'नया विभाग रजिस्टर करें' बटन पर क्लिक करें, सभी जानकारी भरें और सबमिट करें। Admin द्वारा verification के बाद ही आप लॉगिन कर पाएंगे।" },
+  { id: 14, category: "department", question: "विभाग के कितने प्रकार हैं?", answer: "वर्तमान में 5 विभाग हैं: Water Supply, Electricity, Roads & PWD, Sanitation, Healthcare। आप अपनी शिकायत संबंधित विभाग में दर्ज कर सकते हैं।" },
+  { id: 15, category: "department", question: "विभाग अधिकारी शिकायत का स्टेटस कैसे बदलें?", answer: "Department Dashboard में शिकायतों की लिस्ट में 'हल करें' बटन पर क्लिक करें। शिकायत हल होने के बाद नागरिक को नोटिफिकेशन मिलता है।" }
+];
+
+let currentCategory = "all";
+let searchTerm = "";
+
+function renderFAQs() {
+  let filtered = faqData;
+  
+  if (currentCategory !== "all") {
+    filtered = filtered.filter(f => f.category === currentCategory);
+  }
+  
+  if (searchTerm) {
+    filtered = filtered.filter(f => 
+      f.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      f.answer.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+  
+  const container = document.getElementById('faqList');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="no-results">❌ कोई परिणाम नहीं मिला। कृपया दूसरा शब्द खोजें।</div>';
+    return;
+  }
+  
+  container.innerHTML = filtered.map(faq => `
+    <div class="faq-item" data-id="${faq.id}">
+      <div class="faq-question" onclick="toggleFAQ(${faq.id})">
+        <span>${faq.question}</span>
+        <span class="icon">+</span>
+      </div>
+      <div class="faq-answer">${faq.answer}</div>
+    </div>
+  `).join('');
+}
+
+function toggleFAQ(id) {
+  const item = document.querySelector(`.faq-item[data-id="${id}"]`);
+  if (item) {
+    item.classList.toggle('open');
+  }
+}
+
+// Category buttons
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCategory = btn.getAttribute('data-cat');
+    renderFAQs();
+  });
+});
+
+// Search input
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  searchTerm = e.target.value;
+  renderFAQs();
+});
+
+// Initial render
+renderFAQs();
+
+// Chatbot init
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot('guest', 'guest');
+    }
+});
+</script>
+<script src="/static/js/chatbot.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot('guest', 'guest');
+    }
+});
+</script>
+</body>
+</html>

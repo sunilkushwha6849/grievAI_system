@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Login – GrievAI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="login-page bg-admin" style="position:relative;overflow:hidden;">
+  <div style="position:absolute;width:350px;height:350px;border:1px solid rgba(255,255,255,0.07);border-radius:50%;top:-90px;right:-70px;pointer-events:none;"></div>
+  <div style="position:absolute;width:200px;height:200px;border:1px solid rgba(255,255,255,0.05);border-radius:50%;bottom:30px;left:-50px;pointer-events:none;"></div>
+
+  <div class="login-box" style="position:relative;z-index:1;">
+    <a href="/" class="back-link"></a>
+    <div class="login-logo">
+      <div style="width:54px;height:54px;border-radius:13px;background:linear-gradient(135deg,#C0392B,#FF6B00);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">👑</div>
+      <div class="big">Admin Panel</div>
+      <div class="small">प्रशासक पैनल</div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div id="alert-box" class="alert"></div>
+        <div class="form-group">
+          <label class="form-label">📧 Admin Email</label>
+          <input type="email" id="a-email" class="form-control" placeholder="admin@grievai.com" value="admin@grievai.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🔒 पासवर्ड</label>
+          <input type="password" id="a-pass" class="form-control" placeholder="admin123" value="admin123">
+        </div>
+        <button class="btn btn-danger btn-full" onclick="doLogin()">Admin Login →</button>
+      </div>
+    </div>
+<!-- Navigation Buttons - Left Corner Box -->
+<div style="position:fixed; bottom:20px; left:20px; z-index:999; display:flex; gap:12px; background:#fff; padding:10px 15px; border-radius:50px; box-shadow:0 4px 15px rgba(0,0,0,0.2); border:1px solid #e0e0e0;">
+  <button onclick="window.location.href='/'" style="display:flex; align-items:center; gap:8px; background:#1A4FA0; color:#fff; padding:8px 18px; border-radius:40px; border:none; font-size:13px; font-weight:bold; cursor:pointer;">🏠 होम</button>
+  <button onclick="history.back()" style="display:flex; align-items:center; gap:8px; background:#6B3FA0; color:#fff; padding:8px 18px; border-radius:40px; border:none; font-size:13px; font-weight:bold; cursor:pointer;">◀ पीछे जाएं</button>
+</div>
+
+    <div class="hint-box">
+      <b>Default:</b> admin@grievai.com / admin123
+    </div>
+  </div>
+</div>
+<script>
+function showAlert(msg,type){const el=document.getElementById('alert-box');el.className='alert alert-'+type+' show';el.textContent=msg;}
+async function doLogin(){
+  const email=document.getElementById('a-email').value.trim();
+  const pass=document.getElementById('a-pass').value;
+  if(!email||!pass){showAlert('Email और पासवर्ड भरें','danger');return;}
+  const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+  const d=await r.json();
+  if(d.success){localStorage.setItem('admin','1');window.location='/admin/dashboard';}
+  else showAlert(d.message,'danger');
+}
+</script>
+<script src="/static/js/chatbot.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot('guest', 'guest');
+    }
+});
+</script>
+</body>
+</html>

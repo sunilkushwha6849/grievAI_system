@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citizen Dashboard – GrievAI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:15px 25px;background:linear-gradient(135deg,#0E4D2F,#1B8A4E,#0E6B6B);color:#fff;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.topbar-logo{font-size:20px;font-weight:bold;}
+.btn-logout{background:rgba(255,255,255,0.2);border:none;padding:8px 18px;border-radius:8px;color:#fff;cursor:pointer;}
+.btn-logout:hover{background:rgba(255,255,255,0.3);}
+
+.dash-main{padding:25px;max-width:800px;margin:0 auto;}
+
+/* Navigation Buttons - Left Corner Box */
+.nav-box{
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 999;
+  display: flex;
+  gap: 12px;
+  background: #fff;
+  padding: 10px 15px;
+  border-radius: 50px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  border: 1px solid #e0e0e0;
+}
+.nav-btn{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1B8A4E;
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 40px;
+  text-decoration: none;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+.nav-btn.home{
+  background: #1A4FA0;
+}
+.nav-btn.back{
+  background: #6B3FA0;
+}
+.nav-btn:hover{
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+.nav-btn.home:hover{background: #0B3D7E;}
+.nav-btn.back:hover{background: #5B2F8A;}
+
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:30px;}
+.stat-card{background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,0.08);}
+.stat-number{font-size:32px;font-weight:bold;}
+.blue .stat-number{color:#1A4FA0;}
+.orange .stat-number{color:#E67E22;}
+.green .stat-number{color:#1B8A4E;}
+.stat-label{font-size:13px;color:#666;margin-top:5px;}
+
+.tabs{display:flex;gap:10px;margin-bottom:25px;border-bottom:2px solid #E2E8F0;padding-bottom:10px;}
+.tab-btn{padding:10px 25px;border:none;background:transparent;font-size:16px;font-weight:bold;cursor:pointer;border-radius:10px;}
+.tab-btn.active{background:#1B8A4E;color:#fff;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+.form-card{background:#fff;border-radius:20px;padding:25px;box-shadow:0 4px 20px rgba(0,0,0,0.08);}
+.form-group{margin-bottom:20px;}
+.form-label{display:block;font-weight:bold;margin-bottom:8px;color:#333;}
+.required{color:#C0392B;}
+.form-control{width:100%;padding:12px 15px;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;}
+.form-control:focus{outline:none;border-color:#1B8A4E;}
+.form-control.error{border-color:#C0392B;background:#FEE2E2;}
+.form-control[readonly]{background:#f5f5f5;color:#666;cursor:not-allowed;}
+
+.mobile-otp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.otp-btn{background:#1A4FA0;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-weight:bold;cursor:pointer;white-space:nowrap;}
+.otp-btn:hover{background:#0B3D7E;}
+.otp-status{font-size:12px;margin-top:5px;}
+.otp-status.success{color:#1B8A4E;}
+.otp-status.error{color:#C0392B;}
+.otp-status.info{color:#1A4FA0;}
+
+.media-options{display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap;}
+.media-btn{flex:1;padding:12px;border:2px solid #E2E8F0;background:#fff;border-radius:12px;cursor:pointer;font-size:14px;font-weight:bold;transition:all 0.2s;}
+.media-btn.active.text-active{border-color:#1B8A4E;background:#E8F5E9;color:#1B8A4E;}
+.media-btn.active.mic-active{border-color:#E67E22;background:#FFF3E0;color:#E67E22;}
+.media-btn.active.photo-active{border-color:#2196F3;background:#E3F2FD;color:#2196F3;}
+
+.recording-area{background:#F5F5F5;border-radius:12px;padding:15px;margin-bottom:20px;text-align:center;display:none;}
+.recording-area.show{display:block;}
+.record-btn{background:#E67E22;color:#fff;border:none;padding:12px 25px;border-radius:50px;font-size:16px;cursor:pointer;margin:10px;}
+.record-btn.recording{background:#C0392B;animation:pulse 1s infinite;}
+@keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.05);}100%{transform:scale(1);}}
+.play-btn{background:#1B8A4E;color:#fff;border:none;padding:8px 20px;border-radius:50px;cursor:pointer;margin-top:10px;}
+
+.photo-preview{margin-top:15px;text-align:center;display:none;}
+.photo-preview.show{display:block;}
+.photo-preview img{max-width:200px;border-radius:12px;}
+
+.location-area{background:#E8F0FE;border-radius:12px;padding:15px;margin-bottom:20px;}
+.location-status{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.location-btn{background:#1A4FA0;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;}
+.location-info{font-size:12px;color:#666;margin-top:10px;}
+.location-info.success{color:#1B8A4E;}
+.location-info.error{color:#C0392B;}
+
+.submit-btn{width:100%;padding:14px;background:linear-gradient(90deg,#1B8A4E,#0E6B6B);color:#fff;border:none;border-radius:12px;font-size:18px;font-weight:bold;cursor:pointer;}
+
+.complaint-table{width:100%;border-collapse:collapse;}
+.complaint-table th,.complaint-table td{padding:12px;text-align:left;border-bottom:1px solid #eee;}
+.complaint-table th{background:#F0F4FF;}
+.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;}
+.status-pending{background:#FFF3CD;color:#856404;}
+.status-resolved{background:#D1FAE5;color:#065F46;}
+
+.alert{padding:12px 18px;border-radius:10px;margin-bottom:20px;display:none;}
+.alert-success{background:#D1FAE5;color:#065F46;display:block;}
+.alert-danger{background:#FEE2E2;color:#991B1B;display:block;}
+.alert-info{background:#DBEAFE;color:#1E40AF;display:block;}
+
+.error-summary{background:#FEE2E2;border-left:4px solid #C0392B;padding:12px;margin-bottom:20px;border-radius:8px;display:none;}
+.error-summary.show{display:block;}
+.error-summary ul{margin:5px 0 0 20px;color:#991B1B;}
+.error-text{color:#C0392B;font-size:12px;margin-top:5px;display:none;}
+
+.verify-otp-section{display:none; margin-top:10px;}
+.verify-otp-section.show{display:block;}
+.verify-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.verify-input{flex:1; min-width:150px;}
+.verify-btn{background:#1B8A4E;color:#fff;border:none;padding:12px 20px;border-radius:12px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left"><span style="font-size:24px;">👤</span><div><div class="topbar-logo">Citizen Portal</div><div class="topbar-sub">GrievAI – मध्य प्रदेश</div></div></div>
+  <div class="topbar-right"><span id="userGreeting" style="margin-right:15px;"></span><button class="btn-logout" onclick="logout()">🚪 लॉगआउट</button></div>
+</div>
+
+<div class="dash-main">
+  <div id="alertBox" class="alert"></div>
+  <div class="stats-grid">
+    <div class="stat-card blue"><div class="stat-number" id="totalComplaints">0</div><div class="stat-label">कुल शिकायतें</div></div>
+    <div class="stat-card orange"><div class="stat-number" id="pendingComplaints">0</div><div class="stat-label">लंबित</div></div>
+    <div class="stat-card green"><div class="stat-number" id="resolvedComplaints">0</div><div class="stat-label">हल</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('file')">📝 नई शिकायत</button>
+    <button class="tab-btn" onclick="switchTab('my')">📋 मेरी शिकायतें</button>
+    <button class="tab-btn" onclick="switchTab('feedback')">⭐ फीडबैक</button>
+  </div>
+
+  <!-- FILE COMPLAINT TAB -->
+  <div id="tab-file" class="tab-content active">
+    <div class="form-card">
+      <h3 style="margin-bottom:20px; color:#1B8A4E;">📝 नई शिकायत दर्ज करें</h3>
+      <div id="errorSummary" class="error-summary"><strong>❌ कृपया निम्नलिखित त्रुटियाँ सुधारें:</strong><ul id="errorList"></ul></div>
+      
+      <div style="background:#F0F8FF; padding:15px; border-radius:12px; margin-bottom:20px;">
+        <h4 style="margin-bottom:15px; color:#1A4FA0;">📋 चरण 1: अपनी जानकारी भरें</h4>
+        <div class="form-group"><label class="form-label">👤 पूरा नाम <span class="required">*</span></label><input type="text" id="fullName" class="form-control" placeholder="आपका पूरा नाम"><div id="nameError" class="error-text"></div></div>
+        <div class="form-group"><label class="form-label">🏙️ शहर / जिला <span class="required">*</span></label><input type="text" id="city" class="form-control" placeholder="जैसे: भोपाल, इंदौर"><div id="cityError" class="error-text"></div></div>
+        
+        <!-- MOBILE NUMBER WITH OTP - EDITABLE -->
+        <div class="form-group">
+          <label class="form-label">📱 मोबाइल नंबर <span class="required">*</span></label>
+          <div class="mobile-otp-row">
+            <div style="flex:2; min-width:200px;">
+              <input type="tel" id="mobile" class="form-control" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10">
+            </div>
+            <div>
+              <button type="button" class="otp-btn" onclick="sendOTP()">📱 OTP भेजें</button>
+            </div>
+          </div>
+          <div id="otpStatus" class="otp-status"></div>
+          <div id="otpVerifySection" class="verify-otp-section">
+            <div class="verify-row">
+              <input type="text" id="otpCode" class="form-control verify-input" placeholder="6 अंकों का OTP" maxlength="6">
+              <button type="button" class="verify-btn" onclick="verifyOTP()">✅ Verify</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#F0FFF0; padding:15px; border-radius:12px; margin-bottom:20px;">
+        <h4 style="margin-bottom:15px; color:#1B8A4E;">📝 चरण 2: शिकायत की जानकारी</h4>
+        <div class="form-group"><label class="form-label">🏛 विभाग चुनें <span class="required">*</span></label><select id="deptSelect" class="form-control"><option value="">-- विभाग चुनें --</option><option value="Water Supply">💧 Water Supply</option><option value="Electricity">⚡ Electricity</option><option value="Roads & PWD">🛣️ Roads & PWD</option><option value="Sanitation">🧹 Sanitation</option><option value="Healthcare">🏥 Healthcare</option></select><div id="deptError" class="error-text"></div></div>
+        
+        <div class="media-options"><button class="media-btn" id="textBtn" onclick="selectMedia('text')">📝 लिखें</button><button class="media-btn" id="micBtn" onclick="selectMedia('mic')">🎤 बोलें</button><button class="media-btn" id="photoBtn" onclick="selectMedia('photo')">📷 फोटो</button></div>
+        
+        <div id="textArea"><div class="form-group"><label class="form-label">📝 शिकायत विवरण <span class="required">*</span></label><textarea id="complaintText" class="form-control" rows="5" placeholder="अपनी शिकायत विस्तार से लिखें..."></textarea><div id="complaintError" class="error-text"></div></div></div>
+        
+        <div id="voiceArea" style="display:none;"><div class="recording-area show"><button id="recordBtn" class="record-btn" onclick="toggleRecording()">🎤 रिकॉर्डिंग शुरू करें</button><button id="playBtn" class="play-btn" onclick="playRecording()" style="display:none;">▶️ सुनें</button><div id="recordingStatus" style="margin-top:10px; font-size:12px;"></div><div id="voiceError" class="error-text"></div></div></div>
+        
+        <div id="photoArea" style="display:none;"><div class="recording-area show"><input type="file" id="photoInput" accept="image/*" onchange="previewPhoto()"><div id="photoPreview" class="photo-preview"><img id="previewImg" src=""></div><div id="photoError" class="error-text"></div></div></div>
+      </div>
+
+      <div class="location-area"><div class="location-status"><span>📍 <strong>लोकेशन (अनिवार्य)</strong> <span class="required">*</span></span><button id="locationBtn" class="location-btn" onclick="getLocation()">📍 मेरी लोकेशन लें</button></div><div id="locationInfo" class="location-info">⚠️ कृपया "मेरी लोकेशन लें" बटन पर क्लिक करें</div><div id="locationError" class="error-text"></div></div>
+
+      <button id="submitBtn" class="submit-btn" onclick="validateAndSubmit()">🚀 शिकायत दर्ज करें</button>
+    </div>
+  </div>
+
+  <!-- MY COMPLAINTS TAB -->
+  <div id="tab-my" class="tab-content"><div class="form-card"><h3 style="margin-bottom:20px;">📋 मेरी शिकायतें</h3><div style="overflow-x:auto;"><table class="complaint-table"><thead><tr><th>ID</th><th>विभाग</th><th>शिकायत</th><th>स्टेटस</th><th>तारीख</th></tr></thead><tbody id="myComplaintsBody"><tr><td colspan="5" style="text-align:center; padding:20px;">लोड हो रहा है...</td></tr></tbody></table></div></div></div>
+
+  <!-- FEEDBACK TAB -->
+  <div id="tab-feedback" class="tab-content"><div class="form-card"><h3 style="margin-bottom:20px;">⭐ फीडबैक दें</h3><div class="form-group"><label class="form-label">रेटिंग</label><div id="starRating" style="display:flex; gap:5px;"><span class="star" data-rating="1" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(1)">★</span><span class="star" data-rating="2" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(2)">★</span><span class="star" data-rating="3" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(3)">★</span><span class="star" data-rating="4" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(4)">★</span><span class="star" data-rating="5" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(5)">★</span></div></div><div class="form-group"><label class="form-label">💬 आपकी राय</label><textarea id="feedbackMsg" class="form-control" rows="4" placeholder="अपनी राय लिखें..."></textarea></div><button class="submit-btn" onclick="submitFeedback()" style="background:#6B3FA0;">📨 फीडबैक सबमिट करें</button></div></div>
+</div>
+
+<!-- Navigation Buttons - Left Corner Box -->
+<div class="nav-box">
+  <button class="nav-btn home" onclick="goHome()">🏠 होम</button>
+  <button class="nav-btn back" onclick="goBack()">◀ पीछे जाएं</button>
+</div>
+
+<script src="/static/js/chatbot.js"></script>
+<script>
+let citizen = null;
+let isMobileVerified = false;
+let mobileToVerify = '';
+
+try { citizen = JSON.parse(localStorage.getItem('citizen') || 'null'); } catch(e) { citizen = null; }
+if(!citizen) { window.location = '/citizen'; }
+
+document.getElementById('userGreeting').innerHTML = 'नमस्ते, ' + (citizen.name || '');
+document.getElementById('fullName').value = citizen.name || '';
+
+function goHome(){ window.location.href = '/'; }
+function goBack(){ window.history.back(); }
+
+let selectedRating = 3;
+let selectedMedia = 'text';
+let locationData = { lat: null, lng: null, address: null };
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let recordedBlob = null;
+
+function setRating(rating) {
+  selectedRating = rating;
+  document.querySelectorAll('.star').forEach(star => {
+    star.style.color = parseInt(star.getAttribute('data-rating')) <= rating ? '#FFB800' : '#CBD5E0';
+  });
+}
+setRating(3);
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+  if(tab === 'file') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.getElementById('tab-file').classList.add('active');
+  } else if(tab === 'my') {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    document.getElementById('tab-my').classList.add('active');
+    loadMyComplaints();
+  } else if(tab === 'feedback') {
+    document.querySelectorAll('.tab-btn')[2].classList.add('active');
+    document.getElementById('tab-feedback').classList.add('active');
+  }
+}
+
+function selectMedia(type) {
+  selectedMedia = type;
+  document.querySelectorAll('.media-btn').forEach(btn => btn.classList.remove('text-active', 'mic-active', 'photo-active'));
+  if(type === 'text') document.getElementById('textBtn').classList.add('text-active');
+  if(type === 'mic') document.getElementById('micBtn').classList.add('mic-active');
+  if(type === 'photo') document.getElementById('photoBtn').classList.add('photo-active');
+  document.getElementById('textArea').style.display = type === 'text' ? 'block' : 'none';
+  document.getElementById('voiceArea').style.display = type === 'mic' ? 'block' : 'none';
+  document.getElementById('photoArea').style.display = type === 'photo' ? 'block' : 'none';
+}
+
+// ==============================================
+// OTP FUNCTIONS
+// ==============================================
+async function sendOTP() {
+  const mobile = document.getElementById('mobile').value.trim();
+  if (!mobile || mobile.length !== 10 || isNaN(mobile)) {
+    showAlert('❌ कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें', 'danger');
+    return;
+  }
+  
+  const statusDiv = document.getElementById('otpStatus');
+  statusDiv.innerHTML = '<span class="info">⏳ OTP भेजा जा रहा है...</span>';
+  
+  try {
+    const response = await fetch('/api/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: mobile, user_type: 'citizen' })
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      mobileToVerify = mobile;
+      document.getElementById('otpVerifySection').classList.add('show');
+      statusDiv.innerHTML = `<span class="success">✅ OTP भेजा गया! DEMO OTP: ${data.otp}</span>`;
+      showAlert('✅ OTP भेजा गया! अपना OTP दर्ज करें।', 'success');
+    } else {
+      statusDiv.innerHTML = `<span class="error">❌ ${data.message}</span>`;
+      showAlert('❌ ' + data.message, 'danger');
+    }
+  } catch (error) {
+    statusDiv.innerHTML = '<span class="error">❌ नेटवर्क त्रुटि</span>';
+    showAlert('❌ नेटवर्क त्रुटि', 'danger');
+  }
+}
+
+async function verifyOTP() {
+  const otp = document.getElementById('otpCode').value.trim();
+  if (!otp || otp.length !== 6) {
+    showAlert('❌ 6 अंकों का OTP दर्ज करें', 'danger');
+    return;
+  }
+  
+  const statusDiv = document.getElementById('otpStatus');
+  statusDiv.innerHTML = '<span class="info">⏳ वेरिफाई हो रहा है...</span>';
+  
+  try {
+    const response = await fetch('/api/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: mobileToVerify, otp: otp })
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      isMobileVerified = true;
+      statusDiv.innerHTML = '<span class="success">✅ मोबाइल नंबर वेरिफाई हो गया!</span>';
+      document.getElementById('otpVerifySection').classList.remove('show');
+      showAlert('✅ मोबाइल नंबर सफलतापूर्वक वेरिफाई हो गया!', 'success');
+    } else {
+      statusDiv.innerHTML = `<span class="error">❌ ${data.message}</span>`;
+      showAlert('❌ ' + data.message, 'danger');
+    }
+  } catch (error) {
+    statusDiv.innerHTML = '<span class="error">❌ नेटवर्क त्रुटि</span>';
+    showAlert('❌ नेटवर्क त्रुटि', 'danger');
+  }
+}
+
+// ==============================================
+// VOICE RECORDING FUNCTIONS
+// ==============================================
+async function toggleRecording() {
+  if(isRecording) { stopRecording(); } else { startRecording(); }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+    mediaRecorder.onstop = () => {
+      recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      document.getElementById('playBtn').style.display = 'inline-block';
+      document.getElementById('recordingStatus').innerHTML = '✅ रिकॉर्डिंग सहेज ली गई!';
+      document.getElementById('voiceError').style.display = 'none';
+      stream.getTracks().forEach(track => track.stop());
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    const recordBtn = document.getElementById('recordBtn');
+    recordBtn.innerHTML = '⏹️ रिकॉर्डिंग बंद करें';
+    recordBtn.classList.add('recording');
+    document.getElementById('recordingStatus').innerHTML = '🔴 रिकॉर्डिंग हो रही है...';
+  } catch(err) { showAlert('❌ माइक्रोफोन एक्सेस नहीं हुआ', 'danger'); }
+}
+
+function stopRecording() {
+  if(mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    const recordBtn = document.getElementById('recordBtn');
+    recordBtn.innerHTML = '🎤 रिकॉर्डिंग शुरू करें';
+    recordBtn.classList.remove('recording');
+  }
+}
+
+function playRecording() {
+  if(recordedBlob) { const audioUrl = URL.createObjectURL(recordedBlob); new Audio(audioUrl).play(); }
+}
+
+function previewPhoto() {
+  const file = document.getElementById('photoInput').files[0];
+  if(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => { document.getElementById('previewImg').src = e.target.result; document.getElementById('photoPreview').classList.add('show'); };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ==============================================
+// LOCATION FUNCTIONS
+// ==============================================
+function getLocation() {
+  const locationBtn = document.getElementById('locationBtn');
+  const locationInfo = document.getElementById('locationInfo');
+  locationBtn.innerHTML = '⏳ लोकेशन ली जा रही...';
+  locationBtn.disabled = true;
+  if(!navigator.geolocation) {
+    locationInfo.innerHTML = '❌ यह ब्राउजर लोकेशन सपोर्ट नहीं करता';
+    locationInfo.className = 'location-info error';
+    locationBtn.innerHTML = '📍 मेरी लोकेशन लें';
+    locationBtn.disabled = false;
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      locationData.lat = position.coords.latitude;
+      locationData.lng = position.coords.longitude;
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${locationData.lat}&lon=${locationData.lng}&zoom=18`);
+        const data = await response.json();
+        locationData.address = data.display_name || `${locationData.lat}, ${locationData.lng}`;
+      } catch(e) { locationData.address = `${locationData.lat}, ${locationData.lng}`; }
+      locationInfo.innerHTML = `✅ लोकेशन मिल गई!<br>📍 ${locationData.address.substring(0, 100)}...`;
+      locationInfo.className = 'location-info success';
+      locationBtn.innerHTML = '✅ लोकेशन ले ली गई';
+      locationBtn.disabled = false;
+      showAlert('✅ लोकेशन ले ली गई!', 'success');
+    },
+    (error) => {
+      let errorMsg = error.code === 1 ? 'लोकेशन परमिशन नहीं दी गई' : 'लोकेशन उपलब्ध नहीं';
+      locationInfo.innerHTML = `❌ ${errorMsg}`;
+      locationInfo.className = 'location-info error';
+      locationBtn.innerHTML = '📍 पुनः लोकेशन लें';
+      locationBtn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ==============================================
+// VALIDATION & SUBMIT
+// ==============================================
+function validateAndSubmit() {
+  let errors = [];
+  document.querySelectorAll('.error-text').forEach(el => el.style.display = 'none');
+  document.getElementById('errorSummary').classList.remove('show');
+  
+  const name = document.getElementById('fullName').value.trim();
+  if(!name) { errors.push('पूरा नाम भरें'); document.getElementById('nameError').innerHTML = '❌ पूरा नाम भरें'; document.getElementById('nameError').style.display = 'block'; }
+  
+  const city = document.getElementById('city').value.trim();
+  if(!city) { errors.push('शहर / जिला भरें'); document.getElementById('cityError').innerHTML = '❌ शहर भरें'; document.getElementById('cityError').style.display = 'block'; }
+  
+  const mobile = document.getElementById('mobile').value.trim();
+  if(!mobile) { errors.push('मोबाइल नंबर भरें'); document.getElementById('mobileError').innerHTML = '❌ मोबाइल नंबर भरें'; document.getElementById('mobileError').style.display = 'block'; }
+  else if(mobile.length !== 10) { errors.push('मोबाइल नंबर 10 अंकों का होना चाहिए'); }
+  
+  if(!isMobileVerified && mobile) { errors.push('मोबाइल नंबर वेरिफाई करें - OTP भेजें और Verify करें'); }
+  
+  const dept = document.getElementById('deptSelect').value;
+  if(!dept) { errors.push('विभाग चुनें'); document.getElementById('deptError').innerHTML = '❌ विभाग चुनें'; document.getElementById('deptError').style.display = 'block'; }
+  
+  if(selectedMedia === 'text') {
+    const complaint = document.getElementById('complaintText').value.trim();
+    if(!complaint) { errors.push('शिकायत विवरण लिखें'); document.getElementById('complaintError').innerHTML = '❌ शिकायत लिखें'; document.getElementById('complaintError').style.display = 'block'; }
+  } else if(selectedMedia === 'mic') {
+    if(!recordedBlob) { errors.push('वॉइस रिकॉर्ड करें'); document.getElementById('voiceError').innerHTML = '❌ वॉइस रिकॉर्ड करें'; document.getElementById('voiceError').style.display = 'block'; }
+  } else if(selectedMedia === 'photo') {
+    const photo = document.getElementById('photoInput').files[0];
+    if(!photo) { errors.push('फोटो अपलोड करें'); document.getElementById('photoError').innerHTML = '❌ फोटो अपलोड करें'; document.getElementById('photoError').style.display = 'block'; }
+  }
+  
+  if(!locationData.lat || !locationData.lng) {
+    errors.push('लोकेशन लेना अनिवार्य है');
+    document.getElementById('locationError').innerHTML = '❌ लोकेशन लें';
+    document.getElementById('locationError').style.display = 'block';
+  }
+  
+  if(errors.length > 0) {
+    document.getElementById('errorList').innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+    document.getElementById('errorSummary').classList.add('show');
+    showAlert(`❌ ${errors.length} त्रुटियाँ हैं`, 'danger');
+    return;
+  }
+  submitComplaint();
+}
+
+async function submitComplaint() {
+  const name = document.getElementById('fullName').value.trim();
+  const city = document.getElementById('city').value.trim();
+  const mobile = document.getElementById('mobile').value.trim();
+  const dept = document.getElementById('deptSelect').value;
+  
+  let complaintText = '';
+  
+  if(selectedMedia === 'text') {
+    complaintText = `[${city}] ${document.getElementById('complaintText').value.trim()}`;
+  } else if(selectedMedia === 'mic') {
+    complaintText = `[Voice Complaint] [${city}]`;
+  } else if(selectedMedia === 'photo') {
+    complaintText = `[Photo Complaint] [${city}]`;
+  }
+  
+  showAlert('⏳ शिकायत दर्ज की जा रही है...', 'info');
+  
+  const formData = new FormData();
+  formData.append('citizen_name', name);
+  formData.append('citizen_email', citizen.email);
+  formData.append('mobile', mobile);
+  formData.append('complaint_text', complaintText);
+  formData.append('department', dept);
+  formData.append('latitude', locationData.lat);
+  formData.append('longitude', locationData.lng);
+  formData.append('address', locationData.address);
+  formData.append('city', city);
+  
+  if(selectedMedia === 'mic' && recordedBlob) {
+    formData.append('voice', recordedBlob, 'recording.webm');
+  }
+  if(selectedMedia === 'photo' && document.getElementById('photoInput').files[0]) {
+    formData.append('photo', document.getElementById('photoInput').files[0]);
+  }
+  
+  try {
+    const response = await fetch('/api/complaints', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    if(data.success) {
+      showAlert(`✅ शिकायत दर्ज! ID: ${data.complaint_id}`, 'success');
+      resetForm();
+      loadMyComplaints();
+    } else { showAlert('❌ ' + data.message, 'danger'); }
+  } catch(err) { showAlert('❌ Error: ' + err.message, 'danger'); }
+}
+
+function resetForm() {
+  document.getElementById('fullName').value = citizen.name || '';
+  document.getElementById('city').value = '';
+  document.getElementById('deptSelect').value = '';
+  document.getElementById('complaintText').value = '';
+  document.getElementById('mobile').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('photoPreview').classList.remove('show');
+  recordedBlob = null;
+  document.getElementById('playBtn').style.display = 'none';
+  isMobileVerified = false;
+  mobileToVerify = '';
+  document.getElementById('otpStatus').innerHTML = '';
+  document.getElementById('otpVerifySection').classList.remove('show');
+  document.getElementById('otpCode').value = '';
+  locationData = { lat: null, lng: null, address: null };
+  document.getElementById('locationInfo').innerHTML = '⚠️ कृपया "मेरी लोकेशन लें" बटन पर क्लिक करें';
+  document.getElementById('locationInfo').className = 'location-info';
+  document.getElementById('locationBtn').innerHTML = '📍 मेरी लोकेशन लें';
+  document.querySelectorAll('.error-text').forEach(el => el.style.display = 'none');
+  document.getElementById('errorSummary').classList.remove('show');
+}
+
+async function loadMyComplaints() {
+  try {
+    const response = await fetch('/api/complaints?email=' + encodeURIComponent(citizen.email));
+    const complaints = await response.json();
+    document.getElementById('totalComplaints').innerHTML = complaints.length;
+    document.getElementById('pendingComplaints').innerHTML = complaints.filter(c => c.status === 'pending').length;
+    document.getElementById('resolvedComplaints').innerHTML = complaints.filter(c => c.status === 'resolved').length;
+    const tbody = document.getElementById('myComplaintsBody');
+    if(complaints.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">कोई शिकायत नहीं</td></tr>'; return; }
+    tbody.innerHTML = complaints.map(c => `
+      <tr>
+        <td><strong>${c.complaint_id}</strong></td>
+        <td>${c.department}</td>
+        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.complaint_text}</td>
+        <td><span class="status-badge ${c.status === 'pending' ? 'status-pending' : 'status-resolved'}">${c.status === 'pending' ? '⏳ लंबित' : '✅ हल'}</span></td>
+        <td>${new Date(c.created_at).toLocaleDateString()}</td>
+      </tr>
+    `).join('');
+  } catch(err) { console.error(err); }
+}
+
+async function submitFeedback() {
+  const msg = document.getElementById('feedbackMsg').value.trim();
+  if(!msg) { showAlert('❌ फीडबैक लिखें', 'danger'); return; }
+  const response = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name: citizen.name, rating: selectedRating, message: msg }) });
+  const data = await response.json();
+  if(data.success) { showAlert('✅ फीडबैक दर्ज!', 'success'); document.getElementById('feedbackMsg').value = ''; }
+  else { showAlert('❌ ' + data.message, 'danger'); }
+}
+
+function showAlert(msg, type) {
+  const alertBox = document.getElementById('alertBox');
+  alertBox.className = `alert alert-${type}`;
+  alertBox.innerHTML = msg;
+  alertBox.style.display = 'block';
+  setTimeout(() => alertBox.style.display = 'none', 4000);
+}
+
+function logout() { localStorage.removeItem('citizen'); window.location = '/citizen'; }
+
+// Initialize
+selectMedia('text');
+loadMyComplaints();
+
+// Chatbot init
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot(citizen.email || 'guest', 'citizen', '');
+    }
+});
+</script>
+</body>
+</html>

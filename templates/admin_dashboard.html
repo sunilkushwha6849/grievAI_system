@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Dashboard – GrievAI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:15px 25px;background:linear-gradient(90deg,#7B241C,#C0392B,#E67E22);color:#fff;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.topbar-logo{font-size:20px;font-weight:bold;}
+.btn-logout{background:rgba(255,255,255,0.2);border:none;padding:8px 18px;border-radius:8px;color:#fff;cursor:pointer;}
+.btn-logout:hover{background:rgba(255,255,255,0.3);}
+
+/* Create Admin Button - Top Right Corner */
+.create-admin-btn{
+  background: #fff;
+  color: #7B241C;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.create-admin-btn:hover{
+  background: #FFB800;
+  color: #2c2c2c;
+  transform: scale(1.02);
+}
+
+.dash-main{padding:25px;max-width:1400px;margin:0 auto;}
+
+.stats-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:25px;}
+.stat-mini{background:#fff;border-radius:12px;padding:15px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,0.05);border:1px solid #e0e0e0;}
+.stat-mini-num{font-size:28px;font-weight:bold;color:#1A4FA0;}
+.stat-mini-label{font-size:12px;color:#666;margin-top:5px;}
+
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:25px;}
+.dash-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);border:1px solid #e0e0e0;}
+.dash-card-header{padding:15px 20px;font-size:18px;font-weight:bold;color:#fff;display:flex;align-items:center;gap:10px;}
+.dash-card-body{padding:18px;max-height:450px;overflow-y:auto;}
+.full-width{grid-column:span 2;}
+
+.header-pending{background:linear-gradient(135deg,#C0392B,#E67E22);}
+.header-verified{background:linear-gradient(135deg,#1B8A4E,#0E6B6B);}
+.header-complaints{background:linear-gradient(135deg,#1A4FA0,#6B3FA0);}
+.header-citizens{background:linear-gradient(135deg,#0E6B6B,#1A4FA0);}
+.header-admins{background:linear-gradient(135deg,#8E44AD,#9B59B6);}
+
+/* Modal Styles */
+.modal{
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content{
+  background: #fff;
+  border-radius: 20px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90%;
+  overflow-y: auto;
+  padding: 25px;
+  position: relative;
+  animation: slideIn 0.3s ease;
+}
+@keyframes slideIn{
+  from{transform: translateY(-50px); opacity: 0;}
+  to{transform: translateY(0); opacity: 1;}
+}
+.modal-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #8E44AD;
+}
+.modal-header h2{
+  color: #8E44AD;
+  font-size: 24px;
+}
+.close-modal{
+  background: #C0392B;
+  color: #fff;
+  border: none;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.close-modal:hover{background: #A93226;}
+
+/* Form Styles */
+.form-group{margin-bottom: 18px;}
+.form-label{
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #333;
+  font-size: 13px;
+}
+.form-label .required{color: #C0392B;}
+.form-control{
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.form-control:focus{
+  outline: none;
+  border-color: #8E44AD;
+}
+.form-row{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+.btn-submit{
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(90deg,#8E44AD,#9B59B6);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.btn-submit:hover{opacity: 0.9;}
+
+.dept-item{background:#F8FAFF;border-radius:12px;padding:14px;margin-bottom:12px;border-left:4px solid #C0392B;}
+.dept-name{font-size:16px;font-weight:bold;}
+.dept-buttons{margin-top:10px;display:flex;gap:10px;}
+.btn-approve{background:#1B8A4E;color:#fff;border:none;padding:6px 15px;border-radius:8px;cursor:pointer;}
+.btn-reject{background:#C0392B;color:#fff;border:none;padding:6px 15px;border-radius:8px;cursor:pointer;}
+
+.complaint-row{background:#fff;border-bottom:1px solid #eee;padding:12px;}
+.complaint-id{font-weight:bold;color:#1A4FA0;}
+.status-pending{background:#FFF3CD;color:#856404;padding:2px 8px;border-radius:12px;display:inline-block;font-size:11px;}
+.status-resolved{background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:12px;display:inline-block;font-size:11px;}
+.btn-delete{background:#C0392B;color:#fff;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;}
+
+.citizen-item{background:#F5F5F5;border-radius:10px;padding:12px;margin-bottom:10px;}
+.citizen-name{font-weight:bold;color:#1A4FA0;}
+
+.admin-item{background:#F3E8FF;border-radius:10px;padding:12px;margin-bottom:10px;border-left:3px solid #8E44AD;}
+.admin-name{font-weight:bold;color:#8E44AD;}
+.admin-email{font-size:11px;color:#666;}
+.admin-role{font-size:10px;color:#9B59B6;}
+.btn-delete-admin{background:#C0392B;color:#fff;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-top:8px;}
+
+.alert{padding:12px 18px;border-radius:10px;margin-bottom:20px;display:none;}
+.alert-success{background:#D1FAE5;color:#065F46;display:block;}
+.alert-danger{background:#FEE2E2;color:#991B1B;display:block;}
+.alert-info{background:#DBEAFE;color:#1E40AF;display:block;}
+
+@media (max-width: 900px){
+  .dash-grid{grid-template-columns:1fr;}
+  .full-width{grid-column:span 1;}
+  .stats-mini-grid{grid-template-columns:repeat(2,1fr);}
+  .form-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left"><span style="font-size:24px;">👑</span><div><div class="topbar-logo">Admin Panel</div><div class="topbar-sub">GrievAI – Full Control</div></div></div>
+  <div class="topbar-right" style="display:flex; gap:15px; align-items:center;">
+    <span id="adminName" style="margin-right:5px;"></span>
+    <button class="create-admin-btn" onclick="openCreateAdminModal()">➕ नया Admin बनाएं</button>
+    <button class="btn-logout" onclick="logout()">🚪 लॉगआउट</button>
+  </div>
+</div>
+
+<div class="dash-main">
+  <div id="alertBox" class="alert"></div>
+
+  <div class="stats-mini-grid">
+    <div class="stat-mini"><div class="stat-mini-num" id="s-total">0</div><div class="stat-mini-label">📋 कुल शिकायतें</div></div>
+    <div class="stat-mini"><div class="stat-mini-num" id="s-pending">0</div><div class="stat-mini-label">⏳ लंबित</div></div>
+    <div class="stat-mini"><div class="stat-mini-num" id="s-resolved">0</div><div class="stat-mini-label">✅ हल</div></div>
+    <div class="stat-mini"><div class="stat-mini-num" id="s-citizens">0</div><div class="stat-mini-label">👥 नागरिक</div></div>
+  </div>
+
+  <div class="dash-grid">
+    
+    <!-- Pending Departments -->
+    <div class="dash-card">
+      <div class="dash-card-header header-pending"><span>⏳</span> विभाग Verify करें (Pending)</div>
+      <div class="dash-card-body" id="pendingDeptsBody">लोड हो रहा है...</div>
+    </div>
+
+    <!-- Verified Departments -->
+    <div class="dash-card">
+      <div class="dash-card-header header-verified"><span>✅</span> Verified विभाग</div>
+      <div class="dash-card-body" id="verifiedDeptsBody">लोड हो रहा है...</div>
+    </div>
+
+    <!-- Admins List -->
+    <div class="dash-card">
+      <div class="dash-card-header header-admins"><span>👑</span> सभी Admin</div>
+      <div class="dash-card-body" id="adminsList">लोड हो रहा है...</div>
+    </div>
+
+    <!-- All Complaints -->
+    <div class="dash-card full-width">
+      <div class="dash-card-header header-complaints"><span>📋</span> सभी शिकायतें</div>
+      <div class="dash-card-body">
+        <input type="text" id="searchInput" placeholder="🔍 ID, नाम, विभाग से खोजें..." style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;" oninput="filterComplaints()">
+        <div id="complaintsList">लोड हो रहा है...</div>
+      </div>
+    </div>
+
+    <!-- Citizens -->
+    <div class="dash-card">
+      <div class="dash-card-header header-citizens"><span>👥</span> पंजीकृत नागरिक</div>
+      <div class="dash-card-body" id="citizensBody">लोड हो रहा है...</div>
+    </div>
+
+    <!-- System Info -->
+    <div class="dash-card">
+      <div class="dash-card-header" style="background:linear-gradient(135deg,#FF6B00,#FFB800);"><span>ℹ️</span> सिस्टम जानकारी</div>
+      <div class="dash-card-body">
+        <p><strong>🏛 मध्य प्रदेश सरकार</strong></p>
+        <p>📅 <span id="todayDate"></span></p>
+        <p>🤖 AI Auto-Routing Active</p>
+        <hr style="margin:10px 0;">
+        <p>• कुल विभाग: <span id="totalDepts">0</span></p>
+        <p>• Verified विभाग: <span id="verifiedDeptCount">0</span></p>
+        <p>• Pending विभाग: <span id="pendingDeptCount">0</span></p>
+        <p>• कुल Admin: <span id="totalAdmins">0</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Admin Modal -->
+<div id="createAdminModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>➕ नया Admin बनाएं</h2>
+      <button class="close-modal" onclick="closeCreateAdminModal()">✕</button>
+    </div>
+    <form id="createAdminForm" onsubmit="event.preventDefault(); createAdmin();">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">पहला नाम <span class="required">*</span></label>
+          <input type="text" id="firstName" class="form-control" placeholder="पहला नाम" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">अंतिम नाम <span class="required">*</span></label>
+          <input type="text" id="lastName" class="form-control" placeholder="अंतिम नाम" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">पूरा नाम <span class="required">*</span></label>
+        <input type="text" id="fullName" class="form-control" placeholder="पूरा नाम (जैसे: Rajesh Kumar)" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">शहर / जिला <span class="required">*</span></label>
+        <input type="text" id="city" class="form-control" placeholder="जैसे: भोपाल, इंदौर" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Employee ID <span class="required">*</span></label>
+        <input type="text" id="employeeId" class="form-control" placeholder="कर्मचारी ID (जैसे: MP12345)" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Gmail <span class="required">*</span></label>
+        <input type="email" id="adminEmail" class="form-control" placeholder="admin@gmail.com" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">मोबाइल नंबर <span class="required">*</span></label>
+        <input type="tel" id="adminMobile" class="form-control" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">पासवर्ड <span class="required">*</span></label>
+          <input type="password" id="adminPassword" class="form-control" placeholder="कम से कम 6 कैरेक्टर" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">पासवर्ड दोहराएं <span class="required">*</span></label>
+          <input type="password" id="confirmPassword" class="form-control" placeholder="पासवर्ड फिर लिखें" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">✅ Admin Create करें</button>
+    </form>
+  </div>
+</div>
+
+
+<a href="/" style="position:fixed; bottom:20px; left:20px; z-index:999; display:flex; align-items:center; gap:8px; background:#fff; color:#1A4FA0; padding:12px 20px; border-radius:50px; text-decoration:none; font-family:'Baloo 2',sans-serif; font-size:14px; font-weight:bold; box-shadow:0 4px 15px rgba(0,0,0,0.2); border:2px solid #1A4FA0;">🏠 होम पेज पर वापस</a>
+
+<script>
+if(!localStorage.getItem('admin')){ window.location='/admin'; }
+
+let adminName = localStorage.getItem('adminName') || 'Admin';
+document.getElementById('adminName').innerHTML = '👑 ' + adminName;
+
+let allComplaints = [], allCitizens = [], allDepts = [], allAdmins = [];
+
+async function loadAll(){
+  try {
+    const r = await fetch('/api/admin/all-data');
+    const d = await r.json();
+    allComplaints = d.complaints || [];
+    allCitizens = d.citizens || [];
+    allDepts = d.departments || [];
+    allAdmins = d.admins || [];
+    
+    const pendingComplaints = allComplaints.filter(c => c.status === 'pending').length;
+    const resolvedComplaints = allComplaints.filter(c => c.status === 'resolved').length;
+    const pendingDepts = allDepts.filter(d => d.is_verified === 0);
+    const verifiedDepts = allDepts.filter(d => d.is_verified === 1);
+    
+    document.getElementById('s-total').textContent = allComplaints.length;
+    document.getElementById('s-pending').textContent = pendingComplaints;
+    document.getElementById('s-resolved').textContent = resolvedComplaints;
+    document.getElementById('s-citizens').textContent = allCitizens.length;
+    document.getElementById('totalDepts').textContent = allDepts.length;
+    document.getElementById('verifiedDeptCount').textContent = verifiedDepts.length;
+    document.getElementById('pendingDeptCount').textContent = pendingDepts.length;
+    document.getElementById('totalAdmins').textContent = allAdmins.length;
+    document.getElementById('todayDate').innerHTML = new Date().toLocaleDateString('hi-IN');
+    
+    renderPendingDepts(pendingDepts);
+    renderVerifiedDepts(verifiedDepts);
+    renderCitizens(allCitizens);
+    renderComplaints(allComplaints);
+    renderAdmins(allAdmins);
+  } catch(error){
+    console.error("Error:", error);
+  }
+}
+
+function renderPendingDepts(depts){
+  const container = document.getElementById('pendingDeptsBody');
+  if(!depts || depts.length === 0){
+    container.innerHTML = '<div style="text-align:center;color:#1B8A4E;padding:20px;">✅ कोई पेंडिंग विभाग नहीं</div>';
+    return;
+  }
+  container.innerHTML = depts.map(d => `
+    <div class="dept-item">
+      <div class="dept-name">🏛 ${d.dept_name}</div>
+      <div class="dept-officer">👨‍💼 ${d.officer_name}</div>
+      <div class="dept-email">📧 ${d.email}</div>
+      <div class="dept-buttons">
+        <button class="btn-approve" onclick="verifyDept(${d.id}, 'approve')">✅ Approve</button>
+        <button class="btn-reject" onclick="verifyDept(${d.id}, 'reject')">❌ Reject</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderVerifiedDepts(depts){
+  const container = document.getElementById('verifiedDeptsBody');
+  if(!depts || depts.length === 0){
+    container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">📭 कोई verified विभाग नहीं</div>';
+    return;
+  }
+  container.innerHTML = depts.map(d => `
+    <div class="dept-verified-item">
+      <div class="dept-verified-name">🏛 ${d.dept_name}</div>
+      <div style="font-size:12px;">👨‍💼 ${d.officer_name}</div>
+      <div style="font-size:11px;color:#666;">📧 ${d.email}</div>
+    </div>
+  `).join('');
+}
+
+function renderCitizens(citizens){
+  const container = document.getElementById('citizensBody');
+  if(!citizens || citizens.length === 0){
+    container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">👥 कोई नागरिक नहीं</div>';
+    return;
+  }
+  container.innerHTML = citizens.map(c => `
+    <div class="citizen-item">
+      <div class="citizen-name">${c.name}</div>
+      <div class="citizen-email">📧 ${c.email}</div>
+      <div style="font-size:11px;">📱 ${c.mobile || '-'}</div>
+    </div>
+  `).join('');
+}
+
+function renderComplaints(complaints){
+  const container = document.getElementById('complaintsList');
+  if(!complaints || complaints.length === 0){
+    container.innerHTML = '<div style="text-align:center;color:#999;padding:30px;">📭 कोई शिकायत नहीं</div>';
+    return;
+  }
+  container.innerHTML = complaints.map(c => `
+    <div class="complaint-row">
+      <div class="complaint-id">🆔 ${c.complaint_id}</div>
+      <div class="complaint-citizen"><strong>${c.citizen_name}</strong> (${c.citizen_email})</div>
+      <div style="font-size:11px;color:#888;">🏢 ${c.department} | 📅 ${c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}</div>
+      <div class="complaint-text">📝 ${(c.complaint_text || '').substring(0, 100)}${(c.complaint_text || '').length > 100 ? '...' : ''}</div>
+      <div><span class="${c.status === 'pending' ? 'status-pending' : 'status-resolved'}">${c.status === 'pending' ? '⏳ लंबित' : '✅ हल'}</span></div>
+      <button class="btn-delete" onclick="deleteComplaint(${c.id})" style="margin-top:8px;">🗑 हटाएं</button>
+    </div>
+  `).join('');
+}
+
+function renderAdmins(admins){
+  const container = document.getElementById('adminsList');
+  if(!admins || admins.length === 0){
+    container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">👑 कोई admin नहीं</div>';
+    return;
+  }
+  container.innerHTML = admins.map(a => `
+    <div class="admin-item">
+      <div class="admin-name">👑 ${a.name}</div>
+      <div class="admin-email">📧 ${a.email}</div>
+      <div class="admin-role">🔰 ${a.role === 'super_admin' ? 'Super Admin' : 'Admin'}</div>
+      ${a.role !== 'super_admin' ? `<button class="btn-delete-admin" onclick="deleteAdmin(${a.id})">🗑 Delete</button>` : '<span style="font-size:10px;color:#8E44AD;">⭐ Super Admin</span>'}
+    </div>
+  `).join('');
+}
+
+function filterComplaints(){
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  let filtered = allComplaints;
+  if(search){
+    filtered = filtered.filter(c => 
+      (c.complaint_id || '').toLowerCase().includes(search) ||
+      (c.citizen_name || '').toLowerCase().includes(search) ||
+      (c.department || '').toLowerCase().includes(search) ||
+      (c.citizen_email || '').toLowerCase().includes(search)
+    );
+  }
+  renderComplaints(filtered);
+}
+
+async function verifyDept(id, action){
+  if(!confirm(action === 'approve' ? '✅ Verify karna hai?' : '❌ Reject karna hai?')) return;
+  const r = await fetch(`/api/admin/verify-dept/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: action})
+  });
+  const d = await r.json();
+  if(d.success){
+    showAlert(action === 'approve' ? '✅ विभाग Verified!' : '❌ विभाग Rejected!', 'success');
+    loadAll();
+  } else { showAlert('❌ Error!', 'danger'); }
+}
+
+async function deleteComplaint(id){
+  if(!confirm('Delete complaint?')) return;
+  const r = await fetch(`/api/admin/delete-complaint/${id}`, {method: 'DELETE'});
+  const d = await r.json();
+  if(d.success){
+    showAlert('✅ Complaint deleted!', 'success');
+    loadAll();
+  } else { showAlert('❌ Error!', 'danger'); }
+}
+
+function openCreateAdminModal(){
+  document.getElementById('createAdminModal').style.display = 'flex';
+  document.getElementById('createAdminForm').reset();
+}
+
+function closeCreateAdminModal(){
+  document.getElementById('createAdminModal').style.display = 'none';
+}
+
+async function createAdmin(){
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const fullName = document.getElementById('fullName').value.trim();
+  const city = document.getElementById('city').value.trim();
+  const employeeId = document.getElementById('employeeId').value.trim();
+  const email = document.getElementById('adminEmail').value.trim();
+  const mobile = document.getElementById('adminMobile').value.trim();
+  const password = document.getElementById('adminPassword').value;
+  const confirmPass = document.getElementById('confirmPassword').value;
+  
+  // Validation
+  if(!firstName){ showAlert('❌ पहला नाम भरें', 'danger'); return; }
+  if(!lastName){ showAlert('❌ अंतिम नाम भरें', 'danger'); return; }
+  if(!fullName){ showAlert('❌ पूरा नाम भरें', 'danger'); return; }
+  if(!city){ showAlert('❌ शहर भरें', 'danger'); return; }
+  if(!employeeId){ showAlert('❌ Employee ID भरें', 'danger'); return; }
+  if(!email){ showAlert('❌ Gmail भरें', 'danger'); return; }
+  if(!email.includes('@gmail.com')){ showAlert('❌ कृपया Gmail address दें (@gmail.com)', 'danger'); return; }
+  if(!mobile){ showAlert('❌ मोबाइल नंबर भरें', 'danger'); return; }
+  if(mobile.length !== 10){ showAlert('❌ मोबाइल नंबर 10 अंकों का होना चाहिए', 'danger'); return; }
+  if(!password){ showAlert('❌ पासवर्ड भरें', 'danger'); return; }
+  if(password.length < 6){ showAlert('❌ पासवर्ड कम से कम 6 कैरेक्टर', 'danger'); return; }
+  if(password !== confirmPass){ showAlert('❌ पासवर्ड मेल नहीं खाते', 'danger'); return; }
+  
+  const finalName = `${firstName} ${lastName}`;
+  
+  const r = await fetch('/api/admin/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ 
+      name: finalName,
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+      fullName: fullName,
+      city: city,
+      employeeId: employeeId,
+      mobile: mobile
+    })
+  });
+  const d = await r.json();
+  if(d.success){
+    showAlert('✅ ' + d.message, 'success');
+    closeCreateAdminModal();
+    loadAll();
+  } else {
+    showAlert('❌ ' + d.message, 'danger');
+  }
+}
+
+async function deleteAdmin(id){
+  if(!confirm('❌ क्या आप इस Admin को delete करना चाहते हैं?')) return;
+  const r = await fetch(`/api/admin/delete/${id}`, {method: 'DELETE'});
+  const d = await r.json();
+  if(d.success){
+    showAlert('✅ ' + d.message, 'success');
+    loadAll();
+  } else {
+    showAlert('❌ ' + d.message, 'danger');
+  }
+}
+
+function showAlert(msg, type){
+  const el = document.getElementById('alertBox');
+  el.className = `alert alert-${type}`;
+  el.innerHTML = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+function logout(){ localStorage.removeItem('admin'); localStorage.removeItem('adminName'); window.location='/admin'; }
+
+loadAll();
+</script>
+<script src="/static/js/chatbot.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot('guest', 'guest');
+    }
+});
+</script>
+<script src="/static/js/chatbot.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof initChatbot === 'function') {
+        initChatbot('admin@grievai.com', 'admin', '');
+    }
+});
+</script>
+</body>
+</html>

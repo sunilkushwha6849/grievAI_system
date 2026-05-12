@@ -1,0 +1,157 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Hind:wght@400;500;600&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --orange: #FF6B00; --deep-orange: #B34500; --yellow: #FFB800;
+  --green: #1B8A4E; --teal: #0E6B6B; --blue: #1A4FA0;
+  --purple: #6B3FA0; --red: #C0392B; --dark-red: #922B21;
+  --white: #ffffff; --light-bg: #F4F6FB; --border: #E2E8F0;
+  --text: #1A202C; --text-muted: #718096;
+  --success: #1B8A4E; --warning: #D69E2E; --danger: #C0392B;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+body { font-family: 'Hind', sans-serif; background: var(--light-bg); color: var(--text); }
+
+/* ── GRADIENT BACKGROUNDS ── */
+.bg-citizen  { background: linear-gradient(135deg, #0E4D2F 0%, #1B8A4E 35%, #0E6B6B 65%, #1A4FA0 100%); }
+.bg-dept     { background: linear-gradient(135deg, #0B1D6E 0%, #1A4FA0 40%, #6B3FA0 80%, #9B59B6 100%); }
+.bg-admin    { background: linear-gradient(135deg, #7B241C 0%, #C0392B 40%, #E67E22 75%, #FF6B00 100%); }
+.bg-home     { background: linear-gradient(135deg, #0B1D6E 0%, #1A4FA0 30%, #0E6B6B 60%, #1B8A4E 100%); }
+
+/* ── CARDS ── */
+.card {
+  background: var(--white); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.card-header {
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.card-body { padding: 1.5rem; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 20px; border-radius: var(--radius-sm); border: none;
+  font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; text-decoration: none;
+}
+.btn-primary   { background: linear-gradient(90deg, var(--blue), var(--purple)); color: #fff; }
+.btn-success   { background: linear-gradient(90deg, var(--green), var(--teal)); color: #fff; }
+.btn-danger    { background: linear-gradient(90deg, var(--red), var(--orange)); color: #fff; }
+.btn-orange    { background: linear-gradient(90deg, var(--orange), var(--yellow)); color: #fff; }
+.btn-secondary { background: var(--light-bg); color: var(--text); border: 1px solid var(--border); }
+.btn:hover     { opacity: 0.88; transform: translateY(-1px); }
+.btn-full      { width: 100%; }
+.btn-sm        { padding: 6px 12px; font-size: 12px; }
+
+/* ── FORMS ── */
+.form-group { margin-bottom: 1.1rem; }
+.form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.form-control {
+  width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px; font-family: 'Hind', sans-serif;
+  transition: border-color 0.2s; background: #fff; color: var(--text);
+}
+.form-control:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,79,160,0.1); }
+.form-control option { color: var(--text); }
+
+/* ── TABS ── */
+.tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; }
+.tab-btn {
+  padding: 10px 20px; border: none; background: none; cursor: pointer;
+  font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: all 0.2s;
+}
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── STATS CARDS ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 14px; margin-bottom: 1.5rem; }
+.stat-card {
+  border-radius: var(--radius); padding: 1.1rem 1rem; text-align: center; color: #fff; position: relative; overflow: hidden;
+}
+.stat-card::after { content:''; position:absolute; top:-15px; right:-15px; width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,0.1); }
+.stat-card.blue   { background: linear-gradient(135deg, var(--blue), #2980B9); }
+.stat-card.orange { background: linear-gradient(135deg, var(--orange), var(--yellow)); }
+.stat-card.green  { background: linear-gradient(135deg, var(--green), var(--teal)); }
+.stat-card.red    { background: linear-gradient(135deg, var(--red), var(--dark-red)); }
+.stat-card.purple { background: linear-gradient(135deg, var(--purple), #9B59B6); }
+.stat-num  { font-family:'Baloo 2',sans-serif; font-size:28px; font-weight:800; line-height:1; }
+.stat-label { font-size:12px; opacity:0.9; margin-top:3px; }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th { background: linear-gradient(90deg, #F7FAFF, #EFF6FF); padding: 11px 13px; text-align:left; font-weight:600; color: var(--blue); border-bottom: 2px solid var(--border); white-space:nowrap; }
+tbody td { padding: 10px 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #F7FAFF; }
+
+/* ── BADGES ── */
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
+.badge-pending  { background:#FFF3CD; color:#856404; }
+.badge-resolved { background:#D1FAE5; color:#065F46; }
+.badge-info     { background:#DBEAFE; color:#1E40AF; }
+
+/* ── ALERT ── */
+.alert { padding: 11px 15px; border-radius: var(--radius-sm); font-size: 13.5px; margin-bottom: 1rem; display:none; }
+.alert-success { background:#D1FAE5; color:#065F46; border-left: 4px solid var(--green); }
+.alert-danger  { background:#FEE2E2; color:#991B1B; border-left: 4px solid var(--red); }
+.alert.show    { display:block; }
+
+/* ── HEADER ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 0.9rem 1.5rem; color:#fff; position:sticky; top:0; z-index:100;
+}
+.topbar-left { display:flex; align-items:center; gap:10px; }
+.topbar-logo { font-family:'Baloo 2',sans-serif; font-size:20px; font-weight:800; }
+.topbar-sub  { font-size:11px; opacity:0.7; letter-spacing:1px; }
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.user-info   { font-size:13px; opacity:0.85; }
+
+/* ── LOGIN PAGE ── */
+.login-page  { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:2rem; }
+.login-box   { width:100%; max-width:420px; }
+.login-logo  { text-align:center; margin-bottom:1.5rem; color:#fff; }
+.login-logo .big { font-family:'Baloo 2',sans-serif; font-size:28px; font-weight:800; }
+.login-logo .small { font-size:12px; opacity:0.75; letter-spacing:1.5px; }
+.back-link { display:inline-flex; align-items:center; gap:5px; color:rgba(255,255,255,0.75); font-size:13px; text-decoration:none; margin-bottom:1rem; }
+.back-link:hover { color:#fff; }
+
+/* ── DASHBOARD ── */
+.dash-page  { min-height:100vh; display:flex; flex-direction:column; }
+.dash-main  { flex:1; padding:1.5rem; max-width:1100px; margin:0 auto; width:100%; }
+
+/* ── STARS ── */
+.stars { display:flex; gap:4px; }
+.star { font-size:24px; cursor:pointer; color:#CBD5E0; transition:color 0.1s; }
+.star.active { color: var(--yellow); }
+
+/* ── HINT BOX ── */
+.hint-box { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:12px 15px; margin-top:1rem; font-size:12.5px; color:rgba(255,255,255,0.85); }
+.hint-box b { color:#fff; }
+
+/* ── SELECT STATUS ── */
+select.status-sel { padding:4px 8px; border-radius:6px; border:1.5px solid var(--border); font-size:12px; cursor:pointer; background:#fff; }
+
+/* ── SEARCH ── */
+.search-bar { display:flex; gap:10px; margin-bottom:1.2rem; }
+.search-bar input { flex:1; padding:9px 14px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:14px; font-family:'Hind',sans-serif; }
+.search-bar input:focus { outline:none; border-color:var(--blue); }
+
+/* ── RESPONSIVE ── */
+@media (max-width:640px) {
+  .stats-grid { grid-template-columns: repeat(2,1fr); }
+  .tabs { overflow-x:auto; }
+  .tab-btn { font-size:12.5px; padding:8px 14px; white-space:nowrap; }
+  .dash-main { padding:1rem; }
+  .topbar { padding:0.75rem 1rem; }
+  table { font-size:12px; }
+  thead th, tbody td { padding:8px 10px; }
+}
