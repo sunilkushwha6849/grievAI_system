@@ -352,26 +352,29 @@ def citizen_register():
     
     conn = get_db()
     
+    # Check if email already exists
     existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
+    
     if existing:
         if existing['is_verified'] == 1:
             conn.close()
             return jsonify({'success': False, 'message': 'Email already registered and verified!'})
         else:
-            conn.execute('''UPDATE citizens SET name=?, mobile=?, password=?, city=?, is_verified=0 
+            # Update existing unverified user
+            conn.execute('''UPDATE citizens SET name=?, mobile=?, password=?, city=?, is_verified=1 
                            WHERE email=?''', (name, mobile, hash_password(password), city, email))
-            print(f"🔄 Updated existing unverified user: {email}")
+            print(f"🔄 Updated and verified user: {email}")
     else:
+        # Insert new verified user (OTP already verified before this call)
         conn.execute('''INSERT INTO citizens (name, email, mobile, password, city, is_verified) 
-                       VALUES (?,?,?,?,?,0)''',
+                       VALUES (?,?,?,?,?,1)''',
                      (name, email, mobile, hash_password(password), city))
-        print(f"📝 Created new user: {email}")
+        print(f"📝 Created new verified user: {email}")
     
     conn.commit()
     conn.close()
     
-    return jsonify({'success': True, 'message': 'Registration successful! Please login and verify with OTP.'})
-
+    return jsonify({'success': True, 'message': 'Registration successful! You can now login.'})
 # ==============================================
 # API: CITIZEN LOGIN
 # ==============================================
