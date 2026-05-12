@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: grievai-system
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt
+      python -c "from app import init_db; init_db()"
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: BASE_URL
+        value: https://grievai-system.onrender.com
