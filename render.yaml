@@ -11,3 +11,5 @@ services:
         value: 3.10.0
       - key: BASE_URL
         value: https://grievai-system.onrender.com
+      - key: RESEND_API_KEY
+        value: re_cbDSQCj9_5L1jhB3g8xARQHXgSGQFWanj
