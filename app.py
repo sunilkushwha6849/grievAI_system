@@ -1,119 +1,104 @@
-from flask import Flask, request, jsonify, render_template, session
-from flask_cors import CORS
-import sqlite3
+import os
+import re
+import secrets
 import hashlib
 import datetime
-import os
 import random
-import secrets
+import sqlite3
+import requests
+from flask import Flask, request, jsonify, render_template, session
+from flask_cors import CORS
 from functools import wraps
 from time import time
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 CORS(app, supports_credentials=True)
 
-DB_PATH = 'grievai.db'
-OTP_STORE = {}
-VERIFICATION_TOKENS = {}
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-from flask import Flask, request, jsonify, render_template, session
-from flask_cors import CORS
-import sqlite3
-import hashlib
-import datetime
-import os
-import random
-import secrets
-from functools import wraps
-from time import time
-
-app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
-CORS(app, supports_credentials=True)
-
-DB_PATH = 'grievai.db'
-OTP_STORE = {}
-VERIFICATION_TOKENS = {}
+# ==============================================
+# CONFIGURATION
+# ==============================================
+PORT = int(os.environ.get('PORT', 10000))
+BASE_URL = os.environ.get('BASE_URL', 'https://grievai-system.onrender.com')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'grievai.db')
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ==============================================
-# ⚠️ यहाँ अपना Gmail और App Password डालें ⚠️
-# ==============================================
-EMAIL_ENABLED = True   # ← False से True करें
-EMAIL_CONFIG = {
-    'smtp_server': 'smtp.gmail.com',
-    'smtp_port': 587,
-    'sender_email': 'kushwahasunil6341@gmail.com',    # ← अपना Gmail डालें
-    'sender_password': 'igcbslgmehzweqhu' # ← App Password डालें
-}
-# ==============================================
+# Email Configuration (Resend API)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+EMAIL_ENABLED = bool(RESEND_API_KEY)
+
+# Store OTP and Verification Tokens
+OTP_STORE = {}
+VERIFICATION_TOKENS = {}
 
 # ==============================================
-# EMAIL FUNCTIONS - ADD THIS TO YOUR app.py
+# RESEND EMAIL FUNCTION
 # ==============================================
-
-def send_email_async(recipient, subject, body):
-    """Send email in background thread"""
-    def send():
-        try:
-            import smtplib
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
-            
-            msg = MIMEMultipart()
-            msg['From'] = EMAIL_CONFIG['sender_email']
-            msg['To'] = recipient
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'html'))
-            
-            server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
-            server.starttls()
-            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-            server.send_message(msg)
-            server.quit()
-            print(f"✅ Email sent to {recipient}")
-        except Exception as e:
-            print(f"❌ Email error: {e}")
-    
-    import threading
-    thread = threading.Thread(target=send)
-    thread.start()
 
 def send_verification_email(email, name, token):
-    """Send verification email to user"""
-    verification_link = f"http://localhost:5000/verify-email?token={token}&email={email}"
+    """Send verification email using Resend API"""
+    verification_link = f"{BASE_URL}/verify-email?token={token}&email={email}"
     
-    html_body = f"""
+    if not RESEND_API_KEY:
+        print(f"\n⚠️ RESEND_API_KEY not set! Please add it in Render Environment Variables")
+        print(f"📧 Verification link for {email}: {verification_link}\n")
+        return
+    
+    html_content = f"""
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial; text-align: center; background: #f4f6fb; padding: 20px;">
-        <div style="max-width: 450px; margin: auto; background: white; border-radius: 16px; padding: 30px;">
+    <body style="font-family: Arial, sans-serif; text-align: center; background: #f4f6fb; padding: 20px;">
+        <div style="max-width: 450px; margin: auto; background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
             <div style="background: linear-gradient(135deg,#1B8A4E,#0E6B6B); padding: 15px; border-radius: 12px;">
                 <h1 style="color: white; margin: 0;">🏛️ GrievAI</h1>
                 <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0;">मध्य प्रदेश सरकार</p>
             </div>
             
-            <h2 style="color: #1B8A4E;">नमस्ते {name}! 👋</h2>
-            <p>कृपया अपना ईमेल वेरिफाई करने के लिए नीचे दिए गए बटन पर क्लिक करें:</p>
+            <h2 style="color: #1B8A4E; margin-top: 25px;">नमस्ते {name}! 👋</h2>
+            <p style="color: #555; line-height: 1.6;">कृपया अपना ईमेल वेरिफाई करने के लिए नीचे दिए गए बटन पर क्लिक करें:</p>
             
-            <a href="{verification_link}" style="background: #1B8A4E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 50px; display: inline-block; margin: 20px 0;">✅ Verify Email</a>
+            <div style="margin: 25px 0;">
+                <a href="{verification_link}" style="background: linear-gradient(90deg,#1B8A4E,#0E6B6B); color: white; padding: 12px 28px; text-decoration: none; border-radius: 50px; display: inline-block; font-weight: bold;">✅ Verify Email</a>
+            </div>
             
-            <p style="font-size: 12px; color: #666;">या इस लिंक को कॉपी करें:<br>{verification_link}</p>
-            <p style="font-size: 12px; color: #999;">यह लिंक 24 घंटे के लिए वैध है।</p>
+            <p style="color: #666; font-size: 12px;">या इस लिंक को कॉपी करें:</p>
+            <p style="background: #f0f0f0; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 12px;">{verification_link}</p>
+            
+            <p style="color: #888; font-size: 12px; margin-top: 20px;">⚠️ यह लिंक <strong>24 घंटे</strong> के लिए वैध है।</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+            <p style="color: #999; font-size: 11px;">© 2024 GrievAI Portal - मध्य प्रदेश सरकार</p>
         </div>
     </body>
     </html>
     """
     
-    if EMAIL_ENABLED:
-        send_email_async(email, "GrievAI - Verify Your Email", html_body)
-    else:
-        print(f"\n📧 [DEMO] Email would be sent to: {email}")
-        print(f"🔗 Verification link: {verification_link}\n")
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "GrievAI <onboarding@resend.dev>",
+                "to": email,
+                "subject": "GrievAI Portal - Verify Your Email",
+                "html": html_content
+            }
+        )
+        
+        if response.status_code == 200:
+            print(f"✅ Verification email sent successfully to {email}")
+        else:
+            print(f"❌ Failed to send email to {email}: {response.text}")
+            print(f"📧 Verification link: {verification_link}")
+    except Exception as e:
+        print(f"❌ Email error: {e}")
+        print(f"📧 Verification link: {verification_link}")
 
 # ==============================================
 # DATABASE FUNCTIONS
@@ -139,7 +124,7 @@ def generate_verification_token():
     return secrets.token_urlsafe(32)
 
 # ==============================================
-# INIT DATABASE - COMPLETE
+# INIT DATABASE
 # ==============================================
 
 def init_db():
@@ -148,7 +133,6 @@ def init_db():
     
     print("📦 Creating tables...")
     
-    # Citizens table
     c.execute('''CREATE TABLE IF NOT EXISTS citizens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL, 
@@ -160,7 +144,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ citizens table ready")
     
-    # Departments table
     c.execute('''CREATE TABLE IF NOT EXISTS departments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dept_name TEXT NOT NULL, 
@@ -173,7 +156,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ departments table ready")
     
-    # Complaints table
     c.execute('''CREATE TABLE IF NOT EXISTS complaints (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         complaint_id TEXT UNIQUE NOT NULL,
@@ -192,7 +174,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ complaints table ready")
     
-    # Feedback table
     c.execute('''CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_name TEXT, 
@@ -202,7 +183,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ feedback table ready")
     
-    # Admins table
     c.execute('''CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -213,7 +193,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ admins table ready")
     
-    # Insert default data
     c.execute("DELETE FROM departments")
     c.execute("DELETE FROM citizens")
     c.execute("DELETE FROM admins")
@@ -233,30 +212,29 @@ def init_db():
                 (dept_name, officer_name, email, password, mobile, city, is_verified) 
                 VALUES (?,?,?,?,?,?,?)''', d)
             print(f"✓ Department added: {d[0]}")
-        except Exception as e:
-            print(f"⚠️ Department error: {e}")
+        except:
+            pass
     
     # Admin
     try:
         c.execute('''INSERT OR IGNORE INTO admins (name, email, password, mobile, role) 
                      VALUES (?,?,?,?,?)''',
                   ('Super Admin', 'admin@grievai.com', hash_password('admin123'), '9999999999', 'super_admin'))
-        print("✓ Admin created")
-    except Exception as e:
-        print(f"⚠️ Admin error: {e}")
+        print("✓ Admin created: admin@grievai.com / admin123")
+    except:
+        pass
     
-    # Test citizens (pre-verified)
+    # Test citizen
     try:
         c.execute('''INSERT OR IGNORE INTO citizens (name, email, mobile, password, city, is_verified) 
                      VALUES (?,?,?,?,?,?)''',
                   ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
-        print("✓ Test citizen added")
-    except Exception as e:
-        print(f"⚠️ Citizen error: {e}")
+        print("✓ Test citizen added: test@citizen.com / test123")
+    except:
+        pass
     
     conn.commit()
     conn.close()
-    
     print("✅ Database initialized successfully!")
 
 # ==============================================
@@ -302,46 +280,30 @@ def instructions_page():
 # ==============================================
 # VERIFICATION ROUTE
 # ==============================================
+
 @app.route('/verify-email')
 def verify_email():
     token = request.args.get('token')
     email = request.args.get('email')
     
-    print(f"🔍 Verification attempt - Email: {email}")
-    print(f"📦 Stored tokens: {VERIFICATION_TOKENS}")
-    
     if not token or not email:
         return """
         <html>
-        <body style="text-align:center; padding:50px; font-family:Arial;">
+        <body style="text-align:center; padding:50px;">
             <h2 style="color:#C0392B;">❌ Invalid Link</h2>
-            <p>Missing token or email address.</p>
             <a href="/citizen">Go to Login →</a>
         </body>
         </html>
         """
     
-    # Check if token exists
     stored = VERIFICATION_TOKENS.get(email)
     
-    if not stored:
-        return f"""
+    if not stored or stored['token'] != token:
+        return """
         <html>
-        <body style="text-align:center; padding:50px; font-family:Arial;">
-            <h2 style="color:#C0392B;">❌ No Verification Found</h2>
-            <p>No verification request found for <strong>{email}</strong></p>
-            <p>Please <a href="/citizen">register again</a>.</p>
-        </body>
-        </html>
-        """
-    
-    if stored['token'] != token:
-        return f"""
-        <html>
-        <body style="text-align:center; padding:50px; font-family:Arial;">
-            <h2 style="color:#C0392B;">❌ Invalid Token</h2>
-            <p>The verification token is incorrect.</p>
-            <p>Please <a href="/citizen">register again</a>.</p>
+        <body style="text-align:center; padding:50px;">
+            <h2 style="color:#C0392B;">❌ Invalid or Expired Link</h2>
+            <a href="/citizen">Register Again →</a>
         </body>
         </html>
         """
@@ -350,26 +312,19 @@ def verify_email():
         del VERIFICATION_TOKENS[email]
         return """
         <html>
-        <body style="text-align:center; padding:50px; font-family:Arial;">
-            <h2 style="color:#C0392B;">❌ Link Expired</h2>
-            <p>This link is valid for 24 hours only.</p>
-            <p>Please <a href="/citizen">register again</a>.</p>
+        <body style="text-align:center; padding:50px;">
+            <h2 style="color:#C0392B;">❌ Link Expired (24 hours)</h2>
+            <a href="/citizen">Register Again →</a>
         </body>
         </html>
         """
     
-    # MARK AS VERIFIED IN DATABASE
+    # Mark as verified
     conn = get_db()
     conn.execute('UPDATE citizens SET is_verified = 1 WHERE email = ?', (email,))
     conn.commit()
-    
-    # Verify update worked
-    check = conn.execute('SELECT is_verified FROM citizens WHERE email = ?', (email,)).fetchone()
-    print(f"✅ After update - is_verified = {check['is_verified'] if check else 'Not found'}")
-    
     conn.close()
     
-    # Clean up token
     del VERIFICATION_TOKENS[email]
     
     return """
@@ -387,14 +342,14 @@ def verify_email():
     </head>
     <body>
         <div class="card">
-            <h2>✅ Email Verified Successfully!</h2>
+            <h2>✅ Email Verified!</h2>
             <p>आपका ईमेल सफलतापूर्वक वेरिफाई हो गया है।</p>
-            <p>अब आप लॉगिन कर सकते हैं।</p>
             <a href="/citizen" class="btn">Login Now →</a>
         </div>
     </body>
     </html>
     """
+
 # ==============================================
 # API: SEND VERIFICATION
 # ==============================================
@@ -413,13 +368,9 @@ def send_verification():
         'expires': datetime.datetime.now() + datetime.timedelta(hours=24)
     }
     
-    verification_link = f"http://localhost:5000/verify-email?token={token}&email={email}"
-    print(f"\n{'='*50}")
-    print(f"📧 Verification link for {email}:")
-    print(f"🔗 {verification_link}")
-    print(f"{'='*50}\n")
+    send_verification_email(email, "User", token)
     
-    return jsonify({'success': True, 'message': 'Verification link generated! Check terminal or email.'})
+    return jsonify({'success': True, 'message': 'Verification email sent!'})
 
 @app.route('/api/check-verification', methods=['POST'])
 def check_verification():
@@ -462,12 +413,10 @@ def citizen_register():
             conn.close()
             return jsonify({'success': False, 'message': 'Email already registered and verified!'})
         else:
-            # Update existing unverified user
             conn.execute('''UPDATE citizens SET name=?, mobile=?, password=?, city=?, is_verified=0 
                            WHERE email=?''', (name, mobile, hash_password(password), city, email))
             print(f"🔄 Updated existing unverified user: {email}")
     else:
-        # Insert new user
         conn.execute('''INSERT INTO citizens (name, email, mobile, password, city, is_verified) 
                        VALUES (?,?,?,?,?,0)''',
                      (name, email, mobile, hash_password(password), city))
@@ -483,18 +432,10 @@ def citizen_register():
         'expires': datetime.datetime.now() + datetime.timedelta(hours=24)
     }
     
-    # Send verification email
-    verification_link = f"http://localhost:5000/verify-email?token={token}&email={email}"
-    print(f"\n{'='*60}")
-    print(f"📧 VERIFICATION LINK FOR {email}:")
-    print(f"🔗 {verification_link}")
-    print(f"{'='*60}\n")
-    
-    # Try to send real email if configured
-    if EMAIL_ENABLED:
-        send_verification_email(email, name, token)
+    send_verification_email(email, name, token)
     
     return jsonify({'success': True, 'message': 'Registration successful! Please check your email for verification link.'})
+
 # ==============================================
 # API: CITIZEN LOGIN
 # ==============================================
@@ -513,10 +454,8 @@ def citizen_login():
     
     if not row:
         conn.close()
-        print(f"❌ Login failed - User not found or wrong password")
+        print(f"❌ Login failed - User not found")
         return jsonify({'success': False, 'message': 'Email या पासवर्ड गलत है'})
-    
-    print(f"📊 User found - is_verified: {row['is_verified']}")
     
     if row['is_verified'] == 0:
         conn.close()
@@ -527,9 +466,6 @@ def citizen_login():
     print(f"✅ Login successful for {email}")
     
     return jsonify({'success': True, 'name': row['name'], 'email': row['email'], 'mobile': row['mobile'], 'city': row['city'] or ''})
-# ==============================================
-# RESET PASSWORD ROUTE
-# ==============================================
 
 @app.route('/api/citizen/reset-password', methods=['POST'])
 def citizen_reset():
@@ -550,6 +486,11 @@ def citizen_reset():
         return jsonify({'success': False, 'message': 'Email नहीं मिला'})
     
     return jsonify({'success': True, 'message': 'पासवर्ड बदल गया!'})
+
+@app.route('/api/citizen/logout', methods=['POST'])
+def citizen_logout():
+    session.pop('citizen_logged_in', None)
+    return jsonify({'success': True, 'message': 'Logged out'})
 
 # ==============================================
 # API: OTP
@@ -609,7 +550,6 @@ def file_complaint():
         address = request.form.get('address', '')
         city = request.form.get('city', '')
         
-        # Handle voice file
         voice_path = None
         if 'voice' in request.files:
             voice_file = request.files['voice']
@@ -618,7 +558,6 @@ def file_complaint():
                 voice_file.save(os.path.join(UPLOAD_FOLDER, fname))
                 voice_path = fname
         
-        # Handle photo file
         photo_path = None
         if 'photo' in request.files:
             photo_file = request.files['photo']
@@ -688,8 +627,35 @@ def update_status():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================================
-# API: DEPARTMENT (Simplified)
+# API: DEPARTMENT
 # ==============================================
+
+@app.route('/api/department/register', methods=['POST'])
+def dept_register():
+    data = request.json
+    dept_name = data.get('dept_name', '').strip()
+    officer_name = data.get('officer_name', '').strip()
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    mobile = data.get('mobile', '').strip()
+    city = data.get('city', '').strip()
+    
+    if not all([dept_name, officer_name, email, password]):
+        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
+    if len(password) < 6:
+        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
+    
+    conn = get_db()
+    try:
+        conn.execute('''INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) 
+                       VALUES (?,?,?,?,?,?,0)''',
+                     (dept_name, officer_name, email, hash_password(password), mobile, city))
+        conn.commit()
+        return jsonify({'success': True, 'message': 'आवेदन भेज दिया! Admin verify करेगा।'})
+    except sqlite3.IntegrityError:
+        return jsonify({'success': False, 'message': 'Email पहले से रजिस्टर है'})
+    finally: 
+        conn.close()
 
 @app.route('/api/department/login', methods=['POST'])
 def dept_login():
@@ -709,6 +675,11 @@ def dept_login():
     
     return jsonify({'success': True, 'dept_name': row['dept_name'], 'officer_name': row['officer_name'], 'email': row['email']})
 
+@app.route('/api/department/logout', methods=['POST'])
+def dept_logout():
+    session.pop('dept_logged_in', None)
+    return jsonify({'success': True, 'message': 'Logged out'})
+
 # ==============================================
 # API: ADMIN
 # ==============================================
@@ -725,8 +696,89 @@ def admin_login():
     conn.close()
     
     if row:
+        session['admin_logged_in'] = True
         return jsonify({'success': True, 'name': row['name'], 'role': row['role']})
     return jsonify({'success': False, 'message': 'Admin credentials गलत हैं'})
+
+@app.route('/api/admin/logout', methods=['POST'])
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return jsonify({'success': True, 'message': 'Logged out'})
+
+@app.route('/api/admin/all-data', methods=['GET'])
+def admin_all_data():
+    try:
+        conn = get_db()
+        complaints = [dict(row) for row in conn.execute('SELECT * FROM complaints ORDER BY created_at DESC').fetchall()]
+        citizens = [dict(row) for row in conn.execute('SELECT id, name, email, mobile, city, is_verified FROM citizens ORDER BY created_at DESC').fetchall()]
+        departments = [dict(row) for row in conn.execute('SELECT * FROM departments ORDER BY id DESC').fetchall()]
+        admins = [dict(row) for row in conn.execute('SELECT id, name, email, role FROM admins ORDER BY created_at DESC').fetchall()]
+        conn.close()
+        return jsonify({'complaints': complaints, 'citizens': citizens, 'departments': departments, 'admins': admins})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/verify-dept/<int:did>', methods=['POST'])
+def verify_dept(did):
+    try:
+        action = request.json.get('action', 'approve')
+        conn = get_db()
+        if action == 'approve':
+            conn.execute('UPDATE departments SET is_verified=1 WHERE id=?', (did,))
+        else:
+            conn.execute('DELETE FROM departments WHERE id=?', (did,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/admin/delete-complaint/<int:cid>', methods=['DELETE'])
+def delete_complaint(cid):
+    try:
+        conn = get_db()
+        conn.execute('DELETE FROM complaints WHERE id=?', (cid,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/admin/create', methods=['POST'])
+def create_admin():
+    data = request.json
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    mobile = data.get('mobile', '').strip()
+    
+    if not all([name, email, password]):
+        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
+    if len(password) < 6:
+        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
+    
+    conn = get_db()
+    try:
+        conn.execute('INSERT INTO admins (name, email, password, mobile, role) VALUES (?,?,?,?,?)',
+                     (name, email, hash_password(password), mobile, 'admin'))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'✅ Admin {name} created!'})
+    except sqlite3.IntegrityError:
+        return jsonify({'success': False, 'message': '❌ Email already registered'})
+    finally:
+        conn.close()
+
+@app.route('/api/admin/delete/<int:aid>', methods=['DELETE'])
+def delete_admin(aid):
+    conn = get_db()
+    admin = conn.execute('SELECT * FROM admins WHERE id = ?', (aid,)).fetchone()
+    if admin and admin['role'] == 'super_admin':
+        conn.close()
+        return jsonify({'success': False, 'message': '❌ Cannot delete Super Admin'})
+    conn.execute('DELETE FROM admins WHERE id = ?', (aid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': '✅ Admin deleted!'})
 
 # ==============================================
 # API: FEEDBACK
@@ -736,8 +788,8 @@ def admin_login():
 def submit_feedback():
     data = request.json
     conn = get_db()
-    conn.execute('INSERT INTO feedback (user_name, rating, message) VALUES (?,?,?)',
-                 (data.get('user_name', ''), data.get('rating', 5), data.get('message', '')))
+    conn.execute('INSERT INTO feedback (user_name, user_type, rating, message) VALUES (?,?,?,?)',
+                 (data.get('user_name', ''), data.get('user_type', 'citizen'), data.get('rating', 5), data.get('message', '')))
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'message': 'फीडबैक दर्ज हो गया!'})
@@ -761,7 +813,7 @@ def chat():
     elif any(w in msg_lower for w in ['shikayat', 'complaint', 'शिकायत']):
         response = "📝 शिकायत दर्ज करने के लिए Citizen Portal में लॉगिन करें और 'नई शिकायत' टैब पर जाएं।"
     elif any(w in msg_lower for w in ['help', 'मदद']):
-        response = "❓ मैं आपकी मदद कर सकता हूं:\n• शिकायत कैसे दर्ज करें?\n• विभागों के बारे में\n• पासवर्ड रीसेट"
+        response = "❓ मैं आपकी मदद कर सकता हूं:\n• शिकायत कैसे दर्ज करें?\n• विभागों के बारे में\n• पासवर्ड रीसेट\n• फीडबैक कैसे दें?"
     else:
         response = "🤔 मैं आपका प्रश्न समझ नहीं पाया। कृपया 'help' टाइप करें।"
     
@@ -775,8 +827,8 @@ if __name__ == '__main__':
     init_db()
     print("\n" + "=" * 50)
     print("  🏛️ GRIEVAI PORTAL STARTED!")
-    print("  🌐 http://localhost:5000")
+    print(f"  🌐 {BASE_URL}")
     print("  👑 Admin: admin@grievai.com / admin123")
     print("  👤 Citizen: test@citizen.com / test123")
     print("=" * 50 + "\n")
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=PORT)
