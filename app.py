@@ -25,7 +25,6 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'grievai.db')
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Store OTP
 OTP_STORE = {}
 
 # ==============================================
@@ -36,7 +35,6 @@ def generate_otp():
     return ''.join(random.choices('0123456789', k=6))
 
 def send_otp_email(email, otp):
-    """Send OTP via email using Resend API"""
     api_key = os.environ.get('RESEND_API_KEY', '')
     
     html_content = f"""
@@ -106,19 +104,18 @@ def generate_complaint_id():
     rand = ''.join(random.choices('0123456789', k=4))
     return f"GRV{now.strftime('%y%m%d')}{rand}"
 
-# ==============================================
-# NOTIFICATION FUNCTION
-# ==============================================
-
 def create_notification(user_email, user_type, title, message, link=''):
     """Create a notification for user"""
-    conn = get_db()
-    conn.execute('''INSERT INTO notifications (user_email, user_type, title, message, link, is_read, created_at) 
-                   VALUES (?,?,?,?,?,0, CURRENT_TIMESTAMP)''',
-                (user_email, user_type, title, message, link))
-    conn.commit()
-    conn.close()
-    print(f"🔔 Notification created for {user_email}: {title}")
+    try:
+        conn = get_db()
+        conn.execute('''INSERT INTO notifications (user_email, user_type, title, message, link, is_read, created_at) 
+                       VALUES (?,?,?,?,?,0, CURRENT_TIMESTAMP)''',
+                    (user_email, user_type, title, message, link))
+        conn.commit()
+        conn.close()
+        print(f"🔔 Notification created for {user_email}: {title}")
+    except Exception as e:
+        print(f"Notification error: {e}")
 
 # ==============================================
 # INIT DATABASE
@@ -171,11 +168,9 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ complaints table ready")
     
-    # DROP OLD FEEDBACK TABLE IF EXISTS
     c.execute("DROP TABLE IF EXISTS feedback")
-    print("✓ Old feedback table dropped")
+    print("✓ old feedback table dropped")
     
-    # CREATE NEW FEEDBACK TABLE
     c.execute('''CREATE TABLE feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         complaint_id TEXT NOT NULL,
@@ -186,9 +181,8 @@ def init_db():
         message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
-    print("✓ New feedback table created")
+    print("✓ feedback table created")
     
-    # CREATE NOTIFICATIONS TABLE
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT NOT NULL,
@@ -215,7 +209,6 @@ def init_db():
     c.execute("DELETE FROM citizens")
     c.execute("DELETE FROM admins")
     
-    # Default departments
     default_depts = [
         ('Water Supply','Ramesh Sharma','water@grievai.com',hash_password('WaterSupply123'),'9876543201','Bhopal',1),
         ('Electricity','Suresh Verma','electricity@grievai.com',hash_password('Electricity123'),'9876543202','Bhopal',1),
@@ -233,7 +226,6 @@ def init_db():
         except:
             pass
     
-    # Admin
     try:
         c.execute('''INSERT OR IGNORE INTO admins (name, email, password, mobile, role) 
                      VALUES (?,?,?,?,?)''',
@@ -242,7 +234,6 @@ def init_db():
     except:
         pass
     
-    # Test citizen
     try:
         c.execute('''INSERT OR IGNORE INTO citizens (name, email, mobile, password, city, is_verified) 
                      VALUES (?,?,?,?,?,?)''',
@@ -473,10 +464,14 @@ def change_password():
     old_password = data.get('old_password', '')
     new_password = data.get('new_password', '')
     
+    if not old_password or not new_password:
+        return jsonify({'success': False, 'message': 'Old and new password required'})
+    
     if len(new_password) < 6:
         return jsonify({'success': False, 'message': 'New password must be at least 6 characters'})
     
     conn = get_db()
+    
     user = conn.execute('SELECT * FROM citizens WHERE email = ? AND password = ?', 
                        (email, hash_password(old_password))).fetchone()
     
@@ -489,7 +484,6 @@ def change_password():
     conn.commit()
     conn.close()
     
-    # Create notification
     create_notification(email, 'citizen', 'Password Changed', 'Your password has been changed successfully.')
     
     return jsonify({'success': True, 'message': 'Password changed successfully!'})
@@ -523,7 +517,7 @@ def get_citizen_profile():
     })
 
 # ==============================================
-# API: GET NOTIFICATIONS
+# API: NOTIFICATIONS
 # ==============================================
 
 @app.route('/api/notifications', methods=['GET'])
@@ -531,14 +525,21 @@ def get_notifications():
     email = request.args.get('email', '').strip().lower()
     user_type = request.args.get('user_type', 'citizen')
     
+    if not email:
+        return jsonify({'success': True, 'notifications': [], 'unread_count': 0})
+    
     conn = get_db()
-    notifications = conn.execute('''SELECT * FROM notifications 
-                                    WHERE user_email = ? AND user_type = ? 
-                                    ORDER BY created_at DESC LIMIT 50''',
-                                (email, user_type)).fetchall()
-    unread_count = conn.execute('''SELECT COUNT(*) FROM notifications 
-                                   WHERE user_email = ? AND user_type = ? AND is_read = 0''',
-                               (email, user_type)).fetchone()[0]
+    try:
+        notifications = conn.execute('''SELECT * FROM notifications 
+                                        WHERE user_email = ? AND user_type = ? 
+                                        ORDER BY created_at DESC LIMIT 50''',
+                                    (email, user_type)).fetchall()
+        unread_count = conn.execute('''SELECT COUNT(*) FROM notifications 
+                                       WHERE user_email = ? AND user_type = ? AND is_read = 0''',
+                                   (email, user_type)).fetchone()[0]
+    except:
+        notifications = []
+        unread_count = 0
     conn.close()
     
     return jsonify({
@@ -546,10 +547,6 @@ def get_notifications():
         'notifications': [dict(n) for n in notifications],
         'unread_count': unread_count
     })
-
-# ==============================================
-# API: MARK NOTIFICATION AS READ
-# ==============================================
 
 @app.route('/api/notifications/mark-read', methods=['POST'])
 def mark_notification_read():
@@ -565,10 +562,6 @@ def mark_notification_read():
     
     return jsonify({'success': True, 'message': 'Notification marked as read'})
 
-# ==============================================
-# API: MARK ALL NOTIFICATIONS AS READ
-# ==============================================
-
 @app.route('/api/notifications/mark-all-read', methods=['POST'])
 def mark_all_notifications_read():
     data = request.json
@@ -582,6 +575,136 @@ def mark_all_notifications_read():
     conn.close()
     
     return jsonify({'success': True, 'message': 'All notifications marked as read'})
+
+# ==============================================
+# API: FEEDBACK ROUTES
+# ==============================================
+
+@app.route('/api/get-complaint-for-feedback', methods=['POST'])
+def get_complaint_for_feedback():
+    data = request.json
+    complaint_id = data.get('complaint_id', '').strip().upper()
+    email = data.get('email', '').strip().lower()
+    
+    conn = get_db()
+    try:
+        complaint = conn.execute('''SELECT * FROM complaints 
+                                    WHERE complaint_id = ? AND citizen_email = ?''', 
+                                    (complaint_id, email)).fetchone()
+        
+        if not complaint:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
+        
+        existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
+        conn.close()
+        
+        if existing:
+            return jsonify({'success': False, 'message': 'Feedback already submitted for this complaint!'})
+        
+        return jsonify({
+            'success': True,
+            'complaint_id': complaint['complaint_id'],
+            'department': complaint['department'],
+            'status': complaint['status'],
+            'date': complaint['created_at'][:10] if complaint['created_at'] else 'N/A'
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/submit-feedback', methods=['POST'])
+def submit_complaint_feedback():
+    data = request.json
+    complaint_id = data.get('complaint_id', '').strip().upper()
+    citizen_email = data.get('citizen_email', '').strip().lower()
+    citizen_name = data.get('citizen_name', '')
+    department = data.get('department', '')
+    rating = data.get('rating', 0)
+    message = data.get('message', '').strip()
+    
+    if not complaint_id or not message:
+        return jsonify({'success': False, 'message': 'Complaint ID and feedback message required'})
+    
+    if rating < 1 or rating > 5:
+        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'})
+    
+    conn = get_db()
+    
+    complaint = conn.execute('SELECT * FROM complaints WHERE complaint_id = ? AND citizen_email = ?', 
+                            (complaint_id, citizen_email)).fetchone()
+    
+    if not complaint:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Complaint not found!'})
+    
+    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
+    
+    if existing:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Feedback already submitted!'})
+    
+    conn.execute('''INSERT INTO feedback 
+                    (complaint_id, citizen_name, citizen_email, department, rating, message) 
+                    VALUES (?,?,?,?,?,?)''',
+                 (complaint_id, citizen_name, citizen_email, department, rating, message))
+    conn.commit()
+    conn.close()
+    
+    create_notification(department, 'department', 'New Feedback Received', 
+                       f'New feedback received for complaint {complaint_id} with rating {rating}/5',
+                       f'/department/dashboard?tab=feedback')
+    
+    return jsonify({'success': True, 'message': 'Feedback submitted successfully! Thank you!'})
+
+@app.route('/api/my-feedbacks', methods=['GET'])
+def get_my_feedbacks():
+    email = request.args.get('email', '').strip().lower()
+    
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
+                                FROM feedback f 
+                                JOIN complaints c ON f.complaint_id = c.complaint_id
+                                WHERE f.citizen_email = ? 
+                                ORDER BY f.created_at DESC''', (email,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(f) for f in feedbacks])
+
+@app.route('/api/dept-feedbacks', methods=['GET'])
+def get_dept_feedbacks():
+    dept = request.args.get('department', '').strip()
+    
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT * FROM feedback 
+                                WHERE department = ? 
+                                ORDER BY created_at DESC''', (dept,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(f) for f in feedbacks])
+
+@app.route('/api/all-feedbacks', methods=['GET'])
+def get_all_feedbacks():
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
+                                FROM feedback f 
+                                JOIN complaints c ON f.complaint_id = c.complaint_id
+                                ORDER BY f.created_at DESC''').fetchall()
+    
+    stats = conn.execute('''SELECT 
+                            department,
+                            COUNT(*) as total,
+                            AVG(rating) as avg_rating,
+                            SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as satisfied,
+                            SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as dissatisfied
+                            FROM feedback 
+                            GROUP BY department''').fetchall()
+    conn.close()
+    
+    return jsonify({
+        'feedbacks': [dict(f) for f in feedbacks],
+        'stats': [dict(s) for s in stats]
+    })
 
 # ==============================================
 # API: OTP (for password reset)
@@ -712,15 +835,15 @@ def update_status():
         conn = get_db()
         conn.execute('UPDATE complaints SET status=? WHERE id=?', (new_status, complaint_id))
         conn.commit()
-        conn.close()
         
-        # Get complaint details to send notification
         complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (complaint_id,)).fetchone()
         if complaint and new_status == 'resolved':
             create_notification(complaint['citizen_email'], 'citizen', 
                               f'Complaint Resolved - {complaint["complaint_id"]}', 
                               f'Your complaint has been resolved by {complaint["department"]} department.',
                               f'/citizen/dashboard?tab=my')
+        
+        conn.close()
         
         return jsonify({'success': True, 'message': 'Status updated!'})
     except Exception as e:
@@ -887,133 +1010,6 @@ def delete_admin(aid):
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'message': '✅ Admin deleted!'})
-
-# ==============================================
-# API: FEEDBACK (NEW SYSTEM)
-# ==============================================
-
-@app.route('/api/get-complaint-for-feedback', methods=['POST'])
-def get_complaint_for_feedback():
-    data = request.json
-    complaint_id = data.get('complaint_id', '').strip().upper()
-    email = data.get('email', '').strip().lower()
-    
-    conn = get_db()
-    complaint = conn.execute('''SELECT * FROM complaints 
-                                WHERE complaint_id = ? AND citizen_email = ?''', 
-                                (complaint_id, email)).fetchone()
-    
-    if not complaint:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
-    
-    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
-    conn.close()
-    
-    if existing:
-        return jsonify({'success': False, 'message': 'Feedback already submitted for this complaint!'})
-    
-    return jsonify({
-        'success': True,
-        'complaint_id': complaint['complaint_id'],
-        'department': complaint['department'],
-        'status': complaint['status'],
-        'date': complaint['created_at'][:10] if complaint['created_at'] else 'N/A'
-    })
-
-@app.route('/api/submit-feedback', methods=['POST'])
-def submit_complaint_feedback():
-    data = request.json
-    complaint_id = data.get('complaint_id', '').strip().upper()
-    citizen_email = data.get('citizen_email', '').strip().lower()
-    citizen_name = data.get('citizen_name', '')
-    department = data.get('department', '')
-    rating = data.get('rating', 0)
-    message = data.get('message', '').strip()
-    
-    if not complaint_id or not message:
-        return jsonify({'success': False, 'message': 'Complaint ID and feedback message required'})
-    
-    if rating < 1 or rating > 5:
-        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'})
-    
-    conn = get_db()
-    
-    complaint = conn.execute('SELECT * FROM complaints WHERE complaint_id = ? AND citizen_email = ?', 
-                            (complaint_id, citizen_email)).fetchone()
-    
-    if not complaint:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Complaint not found!'})
-    
-    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
-    
-    if existing:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Feedback already submitted!'})
-    
-    conn.execute('''INSERT INTO feedback 
-                    (complaint_id, citizen_name, citizen_email, department, rating, message) 
-                    VALUES (?,?,?,?,?,?)''',
-                 (complaint_id, citizen_name, citizen_email, department, rating, message))
-    conn.commit()
-    conn.close()
-    
-    # Create notification for department
-    create_notification(department, 'department', 'New Feedback Received', 
-                       f'New feedback received for complaint {complaint_id} with rating {rating}/5',
-                       f'/department/dashboard?tab=feedback')
-    
-    return jsonify({'success': True, 'message': 'Feedback submitted successfully! Thank you!'})
-
-@app.route('/api/my-feedbacks', methods=['GET'])
-def get_my_feedbacks():
-    email = request.args.get('email', '').strip().lower()
-    
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
-                                FROM feedback f 
-                                JOIN complaints c ON f.complaint_id = c.complaint_id
-                                WHERE f.citizen_email = ? 
-                                ORDER BY f.created_at DESC''', (email,)).fetchall()
-    conn.close()
-    
-    return jsonify([dict(f) for f in feedbacks])
-
-@app.route('/api/dept-feedbacks', methods=['GET'])
-def get_dept_feedbacks():
-    dept = request.args.get('department', '').strip()
-    
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT * FROM feedback 
-                                WHERE department = ? 
-                                ORDER BY created_at DESC''', (dept,)).fetchall()
-    conn.close()
-    
-    return jsonify([dict(f) for f in feedbacks])
-
-@app.route('/api/all-feedbacks', methods=['GET'])
-def get_all_feedbacks():
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
-                                FROM feedback f 
-                                JOIN complaints c ON f.complaint_id = c.complaint_id
-                                ORDER BY f.created_at DESC''').fetchall()
-    
-    stats = conn.execute('''SELECT 
-                            department,
-                            COUNT(*) as total,
-                            AVG(rating) as avg_rating,
-                            SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as satisfied,
-                            SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as dissatisfied
-                            FROM feedback 
-                            GROUP BY department''').fetchall()
-    conn.close()
-    
-    return jsonify({
-        'feedbacks': [dict(f) for f in feedbacks],
-        'stats': [dict(s) for s in stats]
-    })
 
 # ==============================================
 # API: CHATBOT
