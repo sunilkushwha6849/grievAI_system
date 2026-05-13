@@ -51,7 +51,7 @@ def send_otp_email(email, otp):
             </div>
             <h2 style="color: #1B8A4E;">नमस्ते! 👋</h2>
             <p>आपका OTP कोड नीचे दिया गया है:</p>
-            <div style="font-size: 36px; font-weight: bold; background: #f0f0f0; padding: 15px; border-radius: 10px; letter-spacing: 5px; margin: 20px 0;">
+            <div style="background: #000000; color: #FFD700; font-size: 36px; font-weight: bold; padding: 15px; border-radius: 10px; letter-spacing: 5px; margin: 20px 0;">
                 {otp}
             </div>
             <p style="color: #888; font-size: 12px;">⚠️ यह OTP <strong>10 मिनट</strong> के लिए वैध है।</p>
@@ -107,7 +107,7 @@ def generate_complaint_id():
     return f"GRV{now.strftime('%y%m%d')}{rand}"
 
 # ==============================================
-# INIT DATABASE
+# INIT DATABASE - FIXED WITH NEW FEEDBACK TABLE
 # ==============================================
 
 def init_db():
@@ -157,8 +157,12 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ complaints table ready")
     
-    # NEW FEEDBACK TABLE
-    c.execute('''CREATE TABLE IF NOT EXISTS feedback (
+    # DROP OLD FEEDBACK TABLE IF EXISTS
+    c.execute("DROP TABLE IF EXISTS feedback")
+    print("✓ Old feedback table dropped")
+    
+    # CREATE NEW FEEDBACK TABLE
+    c.execute('''CREATE TABLE feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         complaint_id TEXT NOT NULL,
         citizen_name TEXT NOT NULL,
@@ -168,7 +172,7 @@ def init_db():
         message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
-    print("✓ feedback table ready")
+    print("✓ New feedback table created")
     
     c.execute('''CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,7 +215,7 @@ def init_db():
     except:
         pass
     
-    # Test citizen (pre-verified)
+    # Test citizen
     try:
         c.execute('''INSERT OR IGNORE INTO citizens (name, email, mobile, password, city, is_verified) 
                      VALUES (?,?,?,?,?,?)''',
@@ -220,18 +224,15 @@ def init_db():
     except:
         pass
     
-    # Sample complaints
-    sample_complaints = [
-        ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Test complaint 1', 'Water Supply', 'resolved', None, None, None, None, None, 'Bhopal'),
-    ]
-    
-    for s in sample_complaints:
-        try:
-            c.execute('''INSERT OR IGNORE INTO complaints 
-                (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, photo_path, voice_path, latitude, longitude, address, city) 
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', s)
-        except:
-            pass
+    # Sample complaint for feedback testing
+    try:
+        c.execute('''INSERT OR IGNORE INTO complaints 
+            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, city) 
+            VALUES (?,?,?,?,?,?,?,?)''',
+                  ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Test complaint for feedback', 'Water Supply', 'resolved', 'Bhopal'))
+        print("✓ Sample complaint added")
+    except:
+        pass
     
     conn.commit()
     conn.close()
@@ -310,10 +311,10 @@ def send_otp():
     print(f"[OTP] New registration for {email} => {otp}")
     print(f"{'='*40}\n")
     
-    return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent successfully! Please verify to complete registration.'})
+    return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent successfully!'})
 
 # ==============================================
-# API: VERIFY OTP (FOR REGISTRATION)
+# API: VERIFY OTP
 # ==============================================
 
 @app.route('/api/verify-otp', methods=['POST'])
@@ -332,12 +333,12 @@ def verify_otp():
     
     if datetime.datetime.now() > stored['expires']:
         del OTP_STORE[email]
-        return jsonify({'success': False, 'message': 'OTP expired! Please request again.'})
+        return jsonify({'success': False, 'message': 'OTP expired!'})
     
     if stored['otp'] != otp:
         return jsonify({'success': False, 'message': 'Invalid OTP!'})
     
-    return jsonify({'success': True, 'message': 'OTP verified! You can now complete registration.'})
+    return jsonify({'success': True, 'message': 'OTP verified!'})
 
 # ==============================================
 # API: CITIZEN REGISTER
@@ -406,7 +407,7 @@ def citizen_login():
     if row['is_verified'] == 0:
         conn.close()
         print(f"❌ Login failed - Email not verified")
-        return jsonify({'success': False, 'not_verified': True, 'message': '❌ Please verify your email with OTP!'})
+        return jsonify({'success': False, 'not_verified': True, 'message': '❌ Please verify your email!'})
     
     conn.close()
     print(f"✅ Login successful for {email}")
@@ -445,7 +446,7 @@ def citizen_reset():
     return jsonify({'success': True, 'message': 'पासवर्ड बदल गया!'})
 
 # ==============================================
-# API: OTP (for password reset - legacy)
+# API: OTP (for password reset)
 # ==============================================
 
 @app.route('/api/otp/send', methods=['POST'])
@@ -755,13 +756,12 @@ def get_complaint_for_feedback():
     complaint = conn.execute('''SELECT * FROM complaints 
                                 WHERE complaint_id = ? AND citizen_email = ?''', 
                                 (complaint_id, email)).fetchone()
-    conn.close()
     
     if not complaint:
+        conn.close()
         return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
     
     # Check if feedback already given
-    conn = get_db()
     existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
     conn.close()
     
