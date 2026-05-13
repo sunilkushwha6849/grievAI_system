@@ -34,43 +34,88 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    c.execute('''CREATE TABLE IF NOT EXISTS citizens (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT, email TEXT UNIQUE, mobile TEXT, password TEXT, city TEXT,
-        is_verified INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    # Drop all tables to recreate
+    c.execute("DROP TABLE IF EXISTS citizens")
+    c.execute("DROP TABLE IF EXISTS departments")
+    c.execute("DROP TABLE IF EXISTS complaints")
+    c.execute("DROP TABLE IF EXISTS feedback")
+    c.execute("DROP TABLE IF EXISTS notifications")
+    c.execute("DROP TABLE IF EXISTS admins")
     
-    c.execute('''CREATE TABLE IF NOT EXISTS departments (
+    # Create citizens table
+    c.execute('''CREATE TABLE citizens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        dept_name TEXT, officer_name TEXT, email TEXT UNIQUE, password TEXT,
-        mobile TEXT, city TEXT, is_verified INTEGER DEFAULT 1)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS complaints (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id TEXT UNIQUE, citizen_name TEXT, citizen_email TEXT,
-        mobile TEXT, complaint_text TEXT, department TEXT, status TEXT DEFAULT 'pending',
-        photo_path TEXT, voice_path TEXT, latitude REAL, longitude REAL, address TEXT, city TEXT,
+        name TEXT NOT NULL, 
+        email TEXT UNIQUE NOT NULL,
+        mobile TEXT NOT NULL, 
+        password TEXT NOT NULL,
+        city TEXT DEFAULT '',
+        is_verified INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''CREATE TABLE IF NOT EXISTS feedback (
+    # Create departments table with correct columns
+    c.execute('''CREATE TABLE departments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id TEXT, citizen_name TEXT, citizen_email TEXT,
-        department TEXT, rating INTEGER, message TEXT,
+        dept_name TEXT NOT NULL, 
+        officer_name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL, 
+        password TEXT NOT NULL,
+        mobile TEXT DEFAULT '',
+        city TEXT DEFAULT '',
+        is_verified INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+    # Create complaints table
+    c.execute('''CREATE TABLE complaints (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_email TEXT, user_type TEXT, title TEXT, message TEXT,
-        link TEXT, is_read INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        complaint_id TEXT UNIQUE NOT NULL,
+        citizen_name TEXT NOT NULL, 
+        citizen_email TEXT NOT NULL,
+        mobile TEXT NOT NULL, 
+        complaint_text TEXT NOT NULL,
+        department TEXT NOT NULL, 
+        status TEXT DEFAULT 'pending',
+        photo_path TEXT DEFAULT NULL, 
+        voice_path TEXT DEFAULT NULL,
+        latitude REAL DEFAULT NULL, 
+        longitude REAL DEFAULT NULL,
+        address TEXT DEFAULT NULL,
+        city TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''CREATE TABLE IF NOT EXISTS admins (
+    # Create feedback table
+    c.execute('''CREATE TABLE feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT, email TEXT UNIQUE, password TEXT, role TEXT DEFAULT 'admin')''')
+        complaint_id TEXT NOT NULL,
+        citizen_name TEXT NOT NULL,
+        citizen_email TEXT NOT NULL,
+        department TEXT NOT NULL,
+        rating INTEGER DEFAULT 0,
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Clear and insert default data
-    c.execute("DELETE FROM departments")
-    c.execute("DELETE FROM citizens")
-    c.execute("DELETE FROM admins")
+    # Create notifications table
+    c.execute('''CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        user_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        link TEXT DEFAULT '',
+        is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    # Create admins table
+    c.execute('''CREATE TABLE admins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        mobile TEXT DEFAULT '',
+        role TEXT DEFAULT 'admin',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Insert default departments
     default_depts = [
         ('Water Supply','Ramesh Sharma','water@grievai.com',hash_password('WaterSupply123'),'9876543201','Bhopal',1),
         ('Electricity','Suresh Verma','electricity@grievai.com',hash_password('Electricity123'),'9876543202','Bhopal',1),
@@ -79,17 +124,23 @@ def init_db():
         ('Healthcare','Rakesh Singh','healthcare@grievai.com',hash_password('Healthcare123'),'9876543205','Bhopal',1),
     ]
     for d in default_depts:
-        c.execute('INSERT INTO departments VALUES (?,?,?,?,?,?,?)', d)
+        c.execute('INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,?)', d)
     
-    c.execute("INSERT INTO admins VALUES (1,'Super Admin','admin@grievai.com',?,'super_admin')", (hash_password('admin123'),))
-    c.execute("INSERT INTO citizens VALUES (1,'Test Citizen','test@citizen.com','9999999999',?,'Bhopal',1,CURRENT_TIMESTAMP)", (hash_password('test123'),))
+    # Insert admin
+    c.execute("INSERT INTO admins (name, email, password, role) VALUES (?,?,?,?)", 
+              ('Super Admin', 'admin@grievai.com', hash_password('admin123'), 'super_admin'))
+    
+    # Insert test citizen
+    c.execute("INSERT INTO citizens (name, email, mobile, password, city, is_verified) VALUES (?,?,?,?,?,?)",
+              ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
     
     conn.commit()
     conn.close()
-    print("✅ Database ready!")
+    print("✅ Database created successfully!")
 
 init_db()
 
+# ============== PAGES ==============
 @app.route('/')
 def index(): return render_template('index.html')
 @app.route('/citizen')
@@ -120,8 +171,8 @@ def register():
         conn.commit()
         conn.close()
         return jsonify({'success': True, 'message': 'Registration successful!'})
-    except:
-        return jsonify({'success': False, 'message': 'Email already exists!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/citizen/login', methods=['POST'])
 def login():
@@ -163,7 +214,9 @@ def profile():
     conn = get_db()
     user = conn.execute("SELECT name, email, mobile, city FROM citizens WHERE email=?", (email,)).fetchone()
     conn.close()
-    return jsonify({'success': True, 'profile': dict(user)})
+    if user:
+        return jsonify({'success': True, 'profile': dict(user)})
+    return jsonify({'success': False})
 
 # ============== COMPLAINTS ==============
 @app.route('/api/complaints', methods=['POST'])
@@ -172,15 +225,15 @@ def file_complaint():
         cid = generate_complaint_id()
         conn = get_db()
         conn.execute("""INSERT INTO complaints 
-            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, latitude, longitude, address, city, photo_path, voice_path)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, latitude, longitude, address, city)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (cid, request.form['citizen_name'], request.form['citizen_email'], request.form['mobile'],
              request.form['complaint_text'], request.form['department'],
              request.form.get('latitude'), request.form.get('longitude'), request.form.get('address', ''),
-             request.form.get('city', ''), None, None))
+             request.form.get('city', '')))
         conn.commit()
         conn.close()
-        return jsonify({'success': True, 'complaint_id': cid})
+        return jsonify({'success': True, 'complaint_id': cid, 'message': 'शिकायत दर्ज हो गई!'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
@@ -215,6 +268,7 @@ def get_complaint():
     complaint = conn.execute("SELECT * FROM complaints WHERE complaint_id=? AND citizen_email=?", 
                             (data['complaint_id'], data['email'])).fetchone()
     if not complaint:
+        conn.close()
         return jsonify({'success': False, 'message': 'Complaint not found!'})
     existing = conn.execute("SELECT * FROM feedback WHERE complaint_id=?", (data['complaint_id'],)).fetchone()
     conn.close()
@@ -230,7 +284,7 @@ def submit_feedback():
                 (data['complaint_id'], data['citizen_name'], data['citizen_email'], data['department'], data['rating'], data['message']))
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'message': 'Feedback submitted!'})
+    return jsonify({'success': True, 'message': 'Feedback submitted! Thank you!'})
 
 @app.route('/api/my-feedbacks', methods=['GET'])
 def my_feedbacks():
@@ -296,13 +350,30 @@ def dept_login():
         return jsonify({'success': True, 'dept_name': row['dept_name'], 'officer_name': row['officer_name'], 'email': row['email']})
     return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
+@app.route('/api/department/register', methods=['POST'])
+def dept_register():
+    data = request.json
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,0)",
+                    (data['dept_name'], data['officer_name'], data['email'], hash_password(data['password']), data.get('mobile',''), data.get('city','')))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Application submitted! Admin will verify.'})
+    except:
+        return jsonify({'success': False, 'message': 'Email already exists!'})
+
 # ============== ADMIN ==============
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.json
-    if data['email'] == 'admin@grievai.com' and data['password'] == 'admin123':
+    conn = get_db()
+    row = conn.execute("SELECT * FROM admins WHERE email=? AND password=?", 
+                      (data['email'], hash_password(data['password']))).fetchone()
+    conn.close()
+    if row:
         session['admin_logged_in'] = True
-        return jsonify({'success': True, 'name': 'Super Admin', 'role': 'super_admin'})
+        return jsonify({'success': True, 'name': row['name'], 'role': row['role']})
     return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
 @app.route('/api/admin/all-data', methods=['GET'])
@@ -311,8 +382,9 @@ def admin_all_data():
     complaints = [dict(r) for r in conn.execute("SELECT * FROM complaints ORDER BY created_at DESC").fetchall()]
     citizens = [dict(r) for r in conn.execute("SELECT id, name, email, mobile, city FROM citizens").fetchall()]
     departments = [dict(r) for r in conn.execute("SELECT * FROM departments").fetchall()]
+    admins = [dict(r) for r in conn.execute("SELECT id, name, email, role FROM admins").fetchall()]
     conn.close()
-    return jsonify({'complaints': complaints, 'citizens': citizens, 'departments': departments})
+    return jsonify({'complaints': complaints, 'citizens': citizens, 'departments': departments, 'admins': admins})
 
 @app.route('/api/admin/verify-dept/<int:did>', methods=['POST'])
 def verify_dept(did):
@@ -330,20 +402,50 @@ def delete_complaint(cid):
     conn.close()
     return jsonify({'success': True})
 
+@app.route('/api/admin/create', methods=['POST'])
+def create_admin():
+    data = request.json
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO admins (name, email, password, mobile, role) VALUES (?,?,?,?,?)",
+                    (data['name'], data['email'], hash_password(data['password']), data.get('mobile',''), 'admin'))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Admin created!'})
+    except:
+        return jsonify({'success': False, 'message': 'Email already exists!'})
+
+@app.route('/api/admin/delete/<int:aid>', methods=['DELETE'])
+def delete_admin(aid):
+    conn = get_db()
+    admin = conn.execute("SELECT * FROM admins WHERE id=? AND role='super_admin'", (aid,)).fetchone()
+    if admin:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Cannot delete Super Admin!'})
+    conn.execute("DELETE FROM admins WHERE id=?", (aid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# ============== CHATBOT ==============
 @app.route('/api/chat', methods=['POST'])
 def chat():
     msg = request.json.get('message', '').lower()
     if any(w in msg for w in ['namaste', 'hello', 'hi']):
-        return jsonify({'response': '🙏 नमस्ते! मैं GrievAI सहायक हूं।'})
+        return jsonify({'response': '🙏 नमस्ते! मैं GrievAI सहायक हूं। आपकी कैसे मदद कर सकता हूं?'})
     if any(w in msg for w in ['shikayat', 'complaint']):
-        return jsonify({'response': '📝 Citizen Portal में लॉगिन करें और "नई शिकायत" पर क्लिक करें।'})
+        return jsonify({'response': '📝 Citizen Portal में लॉगिन करें और "नई शिकायत" टैब पर जाएं।'})
+    if any(w in msg for w in ['help', 'मदद']):
+        return jsonify({'response': '❓ मैं आपकी मदद कर सकता हूं: शिकायत कैसे दर्ज करें, स्टेटस कैसे देखें, पासवर्ड कैसे रीसेट करें?'})
     return jsonify({'response': '🤔 कृपया "help" टाइप करें।'})
 
+# ============== START ==============
 if __name__ == '__main__':
     print("\n" + "=" * 50)
     print("  🏛️ GRIEVAI PORTAL READY!")
     print(f"  🌐 {BASE_URL}")
     print("  👑 Admin: admin@grievai.com / admin123")
     print("  👤 Citizen: test@citizen.com / test123")
+    print("  🏢 Dept Water: water@grievai.com / WaterSupply123")
     print("=" * 50 + "\n")
     app.run(host='0.0.0.0', port=PORT)
