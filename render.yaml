@@ -4,12 +4,166 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      python -c "from app import init_db; init_db()"
+      python -c "
+import sqlite3
+import hashlib
+import datetime
+import random
+
+DB_PATH = 'grievai.db'
+
+def hash_password(p):
+    return hashlib.sha256(p.encode()).hexdigest()
+
+def generate_complaint_id():
+    now = datetime.datetime.now()
+    rand = ''.join(random.choices('0123456789', k=4))
+    return f\"GRV{now.strftime('%y%m%d')}{rand}\"
+
+conn = sqlite3.connect(DB_PATH)
+c = conn.cursor()
+
+# Create citizens table
+c.execute('''CREATE TABLE IF NOT EXISTS citizens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL, 
+    email TEXT UNIQUE NOT NULL,
+    mobile TEXT NOT NULL, 
+    password TEXT NOT NULL,
+    city TEXT DEFAULT '',
+    is_verified INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ citizens table ready')
+
+# Create departments table
+c.execute('''CREATE TABLE IF NOT EXISTS departments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dept_name TEXT NOT NULL, 
+    officer_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL, 
+    password TEXT NOT NULL,
+    mobile TEXT DEFAULT '',
+    city TEXT DEFAULT '',
+    is_verified INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ departments table ready')
+
+# Create complaints table
+c.execute('''CREATE TABLE IF NOT EXISTS complaints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    complaint_id TEXT UNIQUE NOT NULL,
+    citizen_name TEXT NOT NULL, 
+    citizen_email TEXT NOT NULL,
+    mobile TEXT NOT NULL, 
+    complaint_text TEXT NOT NULL,
+    department TEXT NOT NULL, 
+    status TEXT DEFAULT 'pending',
+    photo_path TEXT DEFAULT NULL, 
+    voice_path TEXT DEFAULT NULL,
+    latitude REAL DEFAULT NULL, 
+    longitude REAL DEFAULT NULL,
+    address TEXT DEFAULT NULL,
+    city TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ complaints table ready')
+
+# Drop old feedback table
+c.execute('DROP TABLE IF EXISTS feedback')
+print('✓ old feedback table dropped')
+
+# Create new feedback table
+c.execute('''CREATE TABLE feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    complaint_id TEXT NOT NULL,
+    citizen_name TEXT NOT NULL,
+    citizen_email TEXT NOT NULL,
+    department TEXT NOT NULL,
+    rating INTEGER DEFAULT 0,
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ feedback table created')
+
+# Create notifications table
+c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT NOT NULL,
+    user_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    link TEXT DEFAULT '',
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ notifications table ready')
+
+# Create admins table
+c.execute('''CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    mobile TEXT DEFAULT '',
+    role TEXT DEFAULT 'admin',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+print('✓ admins table ready')
+
+# Delete old data
+c.execute('DELETE FROM departments')
+c.execute('DELETE FROM citizens')
+c.execute('DELETE FROM admins')
+
+# Insert default departments
+default_depts = [
+    ('Water Supply','Ramesh Sharma','water@grievai.com',hash_password('WaterSupply123'),'9876543201','Bhopal',1),
+    ('Electricity','Suresh Verma','electricity@grievai.com',hash_password('Electricity123'),'9876543202','Bhopal',1),
+    ('Roads & PWD','Mahesh Patel','roads@grievai.com',hash_password('RoadsPWD123'),'9876543203','Bhopal',1),
+    ('Sanitation','Dinesh Kumar','sanitation@grievai.com',hash_password('Sanitation123'),'9876543204','Bhopal',1),
+    ('Healthcare','Rakesh Singh','healthcare@grievai.com',hash_password('Healthcare123'),'9876543205','Bhopal',1),
+]
+
+for d in default_depts:
+    try:
+        c.execute('''INSERT INTO departments 
+            (dept_name, officer_name, email, password, mobile, city, is_verified) 
+            VALUES (?,?,?,?,?,?,?)''', d)
+        print(f'✓ Department added: {d[0]}')
+    except:
+        pass
+
+# Insert admin
+try:
+    c.execute('''INSERT OR IGNORE INTO admins (name, email, password, mobile, role) 
+                 VALUES (?,?,?,?,?)''',
+              ('Super Admin', 'admin@grievai.com', hash_password('admin123'), '9999999999', 'super_admin'))
+    print('✓ Admin created')
+except:
+    pass
+
+# Insert test citizen
+try:
+    c.execute('''INSERT OR IGNORE INTO citizens (name, email, mobile, password, city, is_verified) 
+                 VALUES (?,?,?,?,?,?)''',
+              ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
+    print('✓ Test citizen added')
+except:
+    pass
+
+# Insert sample complaint
+try:
+    c.execute('''INSERT OR IGNORE INTO complaints 
+        (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, city) 
+        VALUES (?,?,?,?,?,?,?,?)''',
+              ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Sample resolved complaint for feedback testing', 'Water Supply', 'resolved', 'Bhopal'))
+    print('✓ Sample complaint added')
+except:
+    pass
+
+conn.commit()
+conn.close()
+print('✅ Database initialized successfully!')
+"
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
       - key: BASE_URL
         value: https://grievai-system.onrender.com
-      - key: RESEND_API_KEY
-        value: re_cbDSQCj9_5L1jhB3g8xARQHXgSGQFWanj
