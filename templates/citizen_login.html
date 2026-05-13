@@ -66,7 +66,7 @@
 
 .form-group{margin-bottom: 18px;}
 .form-label{
-  display: white;
+  display: block;
   font-weight: bold;
   margin-bottom: 6px;
   color: #333;
@@ -124,6 +124,7 @@
   transform: scale(1.02);
 }
 
+/* OTP MODAL STYLES - FIXED FOR CLEAR VISIBILITY */
 .otp-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:1000;align-items:center;justify-content:center;}
 .otp-modal-content{background:#1a2a1f;border-radius:25px;max-width:500px;width:90%;padding:35px 30px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.6);border:2px solid #1B8A4E;}
 .otp-modal-content h2{font-family:'Baloo 2',sans-serif;font-size:32px;color:#5DCAA5;margin-bottom:15px;font-weight:800;}
@@ -132,13 +133,45 @@
 .otp-pin-input{font-size:36px !important;text-align:center;letter-spacing:10px;font-weight:bold;padding:18px !important;width:100%;border:3px solid #1B8A4E;border-radius:15px;margin-bottom:25px;background:#fff;color:#000;}
 .otp-input:focus, .otp-pin-input:focus{border-color:#FFB800;outline:none;box-shadow:0 0 0 3px rgba(255,184,0,0.3);}
 .otp-buttons{display:flex;gap:15px;justify-content:center;flex-wrap:wrap;margin-top:10px;}
+.otp-buttons button{padding:14px 22px;font-size:17px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;}
+.btn-send{background:#FFB800;color:#2c2c2c;}
+.btn-verify{background:#1B8A4E;color:#fff;}
+.btn-resend{background:#6B3FA0;color:#fff;}
+.btn-close{background:#C0392B;color:#fff;}
+
+/* OTP MESSAGE STYLES - CLEAR AND VISIBLE */
+.otp-message{margin-top:20px;font-size:16px;padding:15px;border-radius:10px;display:none;font-weight:bold;text-align:center;}
+
+/* Success Message - Dark Green Background with White Text */
+.otp-message.success{background:#1B8A4E;color:#FFFFFF;display:block;border-left:5px solid #FFD700;}
+
+/* Error Message - Dark Red Background with White Text */
+.otp-message.error{background:#C0392B;color:#FFFFFF;display:block;border-left:5px solid #FFB800;}
+
+/* Info Message - Dark Blue Background with White Text */
+.otp-message.info{background:#1A4FA0;color:#FFFFFF;display:block;border-left:5px solid #FFB800;}
+
+/* DEMO OTP Code Style - Extra Bright for Visibility */
+.otp-demo-code{
+  display: inline-block;
+  font-size: 32px;
+  font-weight: bold;
+  background: #000000;
+  color: #FFD700;
+  padding: 8px 16px;
+  border-radius: 10px;
+  margin: 10px 0;
+  letter-spacing: 5px;
+  box-shadow: 0 0 10px rgba(255,215,0,0.5);
+}
 
 .note-info{background:rgba(255,255,255,0.1);border-radius:10px;padding:10px;margin-top:15px;font-size:11px;color:rgba(255,255,255,0.7);text-align:center;}
 .btn-primary{background:#1A4FA0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;}
 .btn-primary:hover{background:#0B3D7E;}
+
 .otp-verify-row{display:flex;gap:10px;margin-top:10px;}
-.otp-verify-row input{flex:2;}
-.otp-verify-row button{flex:1; background:#1B8A4E; color:white; border:none; border-radius:8px; cursor:pointer;}
+.otp-verify-row input{flex:2; padding:10px; border:1.5px solid #E2E8F0; border-radius:8px;}
+.otp-verify-row button{flex:1; background:#1B8A4E; color:white; border:none; border-radius:8px; cursor:pointer; padding:10px;}
 </style>
 </head>
 <body>
@@ -246,9 +279,9 @@
           <input type="text" id="registerOtpCode" class="form-control" placeholder="6 अंकों का OTP" maxlength="6">
           <button class="btn-primary" onclick="verifyRegisterOTP()" style="background:#1B8A4E;">✅ Verify OTP</button>
         </div>
-        <div id="registerOtpMessage" style="font-size: 12px; margin-top: 5px;"></div>
+        <div id="registerOtpMessage" style="font-size: 14px; margin-top: 10px; padding: 10px; border-radius: 8px;"></div>
         <div style="margin-top: 10px;">
-          <button class="btn-sm" onclick="resendRegisterOTP()" style="background:#6B3FA0; color:white; padding:8px 15px; border:none; border-radius:5px;">🔄 Resend OTP</button>
+          <button class="btn-sm" onclick="resendRegisterOTP()" style="background:#6B3FA0; color:white; padding:8px 15px; border:none; border-radius:5px; cursor:pointer;">🔄 Resend OTP</button>
         </div>
       </div>
     </div>
@@ -313,18 +346,22 @@ async function doLogin() {
   
   showAlert('⏳ Logging in...', 'info');
   
-  const response = await fetch('/api/citizen/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  const data = await response.json();
-  
-  if (data.success) {
-    localStorage.setItem('citizen', JSON.stringify(data));
-    window.location = '/citizen/dashboard';
-  } else {
-    showAlert(data.message, 'danger');
+  try {
+    const response = await fetch('/api/citizen/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      localStorage.setItem('citizen', JSON.stringify(data));
+      window.location = '/citizen/dashboard';
+    } else {
+      showAlert(data.message, 'danger');
+    }
+  } catch (error) {
+    showAlert('Network error: ' + error.message, 'danger');
   }
 }
 
@@ -382,7 +419,7 @@ async function sendRegisterOTP() {
     if (data.success) {
       document.getElementById('step1Register').style.display = 'none';
       document.getElementById('step2Register').style.display = 'block';
-      document.getElementById('registerOtpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP sent! DEMO OTP: ${data.otp}</span>`;
+      document.getElementById('registerOtpMessage').innerHTML = `<div style="background:#1B8A4E; color:#FFFFFF; padding:12px; border-radius:8px;"><strong>✅ OTP भेजा गया!</strong><br>📱 DEMO OTP: <span style="background:#000000; color:#FFD700; font-size:28px; font-weight:bold; padding:5px 15px; border-radius:8px; display:inline-block; margin-top:8px;">${data.otp}</span><br><span style="font-size:12px;">यह OTP 10 मिनट के लिए वैध है</span></div>`;
       showAlert('✅ OTP sent! Enter the OTP to complete registration.', 'success');
     } else {
       showAlert('❌ ' + data.message, 'danger');
@@ -404,7 +441,7 @@ async function resendRegisterOTP() {
     const data = await response.json();
     
     if (data.success) {
-      document.getElementById('registerOtpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP resent! DEMO OTP: ${data.otp}</span>`;
+      document.getElementById('registerOtpMessage').innerHTML = `<div style="background:#1B8A4E; color:#FFFFFF; padding:12px; border-radius:8px;"><strong>✅ OTP पुनः भेजा गया!</strong><br>📱 DEMO OTP: <span style="background:#000000; color:#FFD700; font-size:28px; font-weight:bold; padding:5px 15px; border-radius:8px; display:inline-block; margin-top:8px;">${data.otp}</span></div>`;
       showAlert('✅ OTP resent!', 'success');
     } else {
       showAlert('❌ ' + data.message, 'danger');
@@ -418,6 +455,7 @@ async function verifyRegisterOTP() {
   const otp = document.getElementById('registerOtpCode').value.trim();
   if (!otp || otp.length !== 6) {
     showAlert('❌ 6 अंकों का OTP दर्ज करें', 'danger');
+    document.getElementById('registerOtpMessage').innerHTML = `<div style="background:#C0392B; color:#FFFFFF; padding:12px; border-radius:8px;">❌ कृपया 6 अंकों का OTP दर्ज करें</div>`;
     return;
   }
   
@@ -432,7 +470,7 @@ async function verifyRegisterOTP() {
     const verifyData = await verifyResponse.json();
     
     if (!verifyData.success) {
-      document.getElementById('registerOtpMessage').innerHTML = `<span style="color: #C0392B;">❌ ${verifyData.message}</span>`;
+      document.getElementById('registerOtpMessage').innerHTML = `<div style="background:#C0392B; color:#FFFFFF; padding:12px; border-radius:8px;">❌ ${verifyData.message}</div>`;
       showAlert('❌ ' + verifyData.message, 'danger');
       return;
     }
@@ -480,19 +518,28 @@ async function sendOTPStep1() {
   resetEmail = email;
   const msgDiv = document.getElementById('otpMessageReset');
   msgDiv.className = 'otp-message info';
-  msgDiv.textContent = '⏳ Sending OTP...';
+  msgDiv.innerHTML = '⏳ OTP भेजा जा रहा है...';
   document.getElementById('step1Div').style.display = 'none';
   document.getElementById('step2Div').style.display = 'block';
   document.getElementById('otpEmailDisplay').textContent = resetEmail;
   
-  const r = await fetch('/api/otp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: email, user_type: 'citizen' }) });
-  const d = await r.json();
-  if (d.success) {
-    msgDiv.className = 'otp-message success';
-    msgDiv.innerHTML = '✅ OTP sent!<br>📱 DEMO OTP: <span style="font-size:28px;font-weight:bold;">' + d.otp + '</span>';
-  } else {
+  try {
+    const r = await fetch('/api/otp/send', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ target: email, user_type: 'citizen' }) 
+    });
+    const d = await r.json();
+    if (d.success) {
+      msgDiv.className = 'otp-message success';
+      msgDiv.innerHTML = `<strong>✅ OTP भेजा गया!</strong><br>📱 DEMO OTP: <span class="otp-demo-code">${d.otp}</span>`;
+    } else {
+      msgDiv.className = 'otp-message error';
+      msgDiv.innerHTML = `❌ ${d.message}`;
+    }
+  } catch (error) {
     msgDiv.className = 'otp-message error';
-    msgDiv.textContent = '❌ ' + d.message;
+    msgDiv.innerHTML = '❌ Network error. Please try again.';
   }
 }
 
@@ -500,40 +547,80 @@ async function resendOTP() {
   if (!resetEmail) return;
   const msgDiv = document.getElementById('otpMessageReset');
   msgDiv.className = 'otp-message info';
-  msgDiv.textContent = '⏳ Resending OTP...';
-  const r = await fetch('/api/otp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: resetEmail, user_type: 'citizen' }) });
-  const d = await r.json();
-  if (d.success) {
-    msgDiv.className = 'otp-message success';
-    msgDiv.innerHTML = '✅ OTP resent!<br>📱 DEMO OTP: <span style="font-size:28px;font-weight:bold;">' + d.otp + '</span>';
-  } else {
+  msgDiv.innerHTML = '⏳ पुनः भेजा जा रहा...';
+  
+  try {
+    const r = await fetch('/api/otp/send', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ target: resetEmail, user_type: 'citizen' }) 
+    });
+    const d = await r.json();
+    if (d.success) {
+      msgDiv.className = 'otp-message success';
+      msgDiv.innerHTML = `<strong>✅ OTP पुनः भेजा गया!</strong><br>📱 DEMO OTP: <span class="otp-demo-code">${d.otp}</span>`;
+    } else {
+      msgDiv.className = 'otp-message error';
+      msgDiv.innerHTML = `❌ ${d.message}`;
+    }
+  } catch (error) {
     msgDiv.className = 'otp-message error';
-    msgDiv.textContent = '❌ ' + d.message;
+    msgDiv.innerHTML = '❌ Network error. Please try again.';
   }
 }
 
 async function verifyOTPAndReset() {
   const otp = document.getElementById('otpCodeReset').value.trim();
   const msgDiv = document.getElementById('otpMessageReset');
-  if (!otp || otp.length !== 6) { msgDiv.className = 'otp-message error'; msgDiv.textContent = '❌ Enter 6-digit OTP'; return; }
-  msgDiv.className = 'otp-message info'; msgDiv.textContent = '⏳ Verifying...';
+  if (!otp || otp.length !== 6) { 
+    msgDiv.className = 'otp-message error'; 
+    msgDiv.innerHTML = '❌ 6 अंकों का OTP दर्ज करें'; 
+    return; 
+  }
+  msgDiv.className = 'otp-message info'; 
+  msgDiv.innerHTML = '⏳ वेरिफाई हो रहा...';
   
-  const v = await fetch('/api/otp/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: resetEmail, otp: otp }) });
-  const vd = await v.json();
-  if (!vd.success) { msgDiv.className = 'otp-message error'; msgDiv.textContent = '❌ ' + vd.message; return; }
-  
-  const newPass = prompt('🔐 Enter new password (6+ characters):');
-  if (!newPass || newPass.length < 6) { msgDiv.className = 'otp-message error'; msgDiv.textContent = '❌ Password must be 6+ characters'; return; }
-  
-  const r = await fetch('/api/citizen/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: resetEmail, new_password: newPass }) });
-  const rd = await r.json();
-  if (rd.success) {
-    msgDiv.className = 'otp-message success';
-    msgDiv.innerHTML = '✅ ' + rd.message + '<br>Now login!';
-    setTimeout(() => { closeOTPModal(); document.getElementById('l-pass').value = ''; document.getElementById('l-email').value = resetEmail; }, 2000);
-  } else {
+  try {
+    const v = await fetch('/api/otp/verify', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ target: resetEmail, otp: otp }) 
+    });
+    const vd = await v.json();
+    if (!vd.success) { 
+      msgDiv.className = 'otp-message error'; 
+      msgDiv.innerHTML = `❌ ${vd.message}`; 
+      return; 
+    }
+    
+    const newPass = prompt('🔐 नया पासवर्ड (6+ कैरेक्टर):');
+    if (!newPass || newPass.length < 6) { 
+      msgDiv.className = 'otp-message error'; 
+      msgDiv.innerHTML = '❌ पासवर्ड 6+ कैरेक्टर'; 
+      return; 
+    }
+    
+    const r = await fetch('/api/citizen/reset-password', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ email: resetEmail, new_password: newPass }) 
+    });
+    const rd = await r.json();
+    if (rd.success) {
+      msgDiv.className = 'otp-message success';
+      msgDiv.innerHTML = `✅ ${rd.message}<br>अब लॉगिन करें!`;
+      setTimeout(() => { 
+        closeOTPModal(); 
+        document.getElementById('l-pass').value = ''; 
+        document.getElementById('l-email').value = resetEmail; 
+      }, 2000);
+    } else {
+      msgDiv.className = 'otp-message error';
+      msgDiv.innerHTML = `❌ ${rd.message}`;
+    }
+  } catch (error) {
     msgDiv.className = 'otp-message error';
-    msgDiv.textContent = '❌ ' + rd.message;
+    msgDiv.innerHTML = '❌ Network error. Please try again.';
   }
 }
 
