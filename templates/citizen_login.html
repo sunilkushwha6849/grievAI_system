@@ -23,8 +23,10 @@
 .modal-content{
   background: #fff;
   border-radius: 20px;
-  max-width: 500px;
+  max-width: 550px;
   width: 90%;
+  max-height: 90%;
+  overflow-y: auto;
   padding: 25px;
   position: relative;
   animation: slideIn 0.3s ease;
@@ -45,39 +47,41 @@
 .close-modal{
   background: #C0392B; color: #fff; border: none; width: 35px; height: 35px;
   border-radius: 50%; font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 .close-modal:hover{ background: #A93226; }
 .form-group{margin-bottom: 18px;}
 .form-label{ display: block; font-weight: bold; margin-bottom: 6px; color: #333; font-size: 13px; }
+.form-label .required{ color: #C0392B; }
 .form-control{
   width: 100%; padding: 10px 12px; border: 1.5px solid #E2E8F0;
   border-radius: 10px; font-size: 14px;
 }
 .form-control:focus{ outline: none; border-color: #1B8A4E; }
-.otp-pin-input{ font-size: 32px !important; text-align: center; letter-spacing: 8px; font-weight: bold; }
-.otp-buttons{ display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
-.otp-buttons button{ padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-.btn-send{ background: #FFB800; color: #2c2c2c; }
-.btn-verify{ background: #1B8A4E; color: #fff; }
-.btn-resend{ background: #6B3FA0; color: #fff; }
-.btn-close{ background: #C0392B; color: #fff; }
-.otp-message{ margin-top: 15px; font-size: 14px; padding: 8px; border-radius: 8px; display: none; }
-.otp-message.success{ background: #D1FAE5; color: #065F46; display: block; }
-.otp-message.error{ background: #FEE2E2; color: #991B1B; display: block; }
-.otp-message.info{ background: #DBEAFE; color: #1E40AF; display: block; }
+.form-row{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.btn-submit{
+  width: 100%; padding: 12px; background: linear-gradient(90deg,#1B8A4E,#0E6B6B);
+  color: #fff; border: none; border-radius: 10px; font-size: 16px;
+  font-weight: bold; cursor: pointer; margin-top: 10px;
+}
+.btn-submit:hover{ opacity: 0.9; }
 .register-btn-top{
   background: #fff; color: #1B8A4E; border: none; padding: 10px 20px;
   border-radius: 50px; cursor: pointer; font-size: 14px; font-weight: bold;
+  display: flex; align-items: center; gap: 8px;
 }
 .register-btn-top:hover{ background: #FFB800; color: #2c2c2c; transform: scale(1.02); }
 .note-info{ background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-top: 15px; font-size: 11px; color: rgba(255,255,255,0.7); text-align: center; }
+.otp-box{ background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 10px; display: none; }
+.otp-box.show{ display: block; }
+.otp-code{ font-size: 28px; font-weight: bold; color: #1B8A4E; background: #fff; padding: 10px; border-radius: 8px; text-align: center; letter-spacing: 5px; margin-top: 10px; }
 </style>
 </head>
 <body>
-<div class="login-page bg-citizen">
-  <div class="login-box" style="max-width:480px;">
+<div class="login-page bg-citizen" style="position:relative;overflow:hidden;">
+  <div class="login-box" style="position:relative;z-index:1;max-width:480px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-      <a href="/" class="back-link" style="color:#fff;">← होम</a>
+      <a href="/" class="back-link" style="color:#fff;font-weight:bold;">← होम</a>
       <button class="register-btn-top" onclick="openRegisterModal()">📝 नया अकाउंट बनाएं</button>
     </div>
     <div class="login-logo">
@@ -99,9 +103,9 @@
             <input type="password" id="l-pass" class="form-control" placeholder="पासवर्ड">
           </div>
           <div class="forgot-link">
-            <a onclick="openForgotPassword()">🔑 पासवर्ड भूल गए?</a>
+            <a onclick="alert('Contact admin to reset password: admin@grievai.com')">🔑 पासवर्ड भूल गए?</a>
           </div>
-          <button class="btn btn-success btn-full" onclick="doLogin()" style="background:#1B8A4E;">लॉगिन करें →</button>
+          <button class="btn btn-success btn-full" onclick="doLogin()" style="background:#1B8A4E;font-size:16px;padding:12px;">लॉगिन करें →</button>
         </div>
       </div>
     </div>
@@ -109,7 +113,7 @@
   </div>
 </div>
 
-<!-- Citizen Registration Modal (OTP during registration) -->
+<!-- Citizen Registration Modal -->
 <div id="registerModal" class="modal">
   <div class="modal-content">
     <div class="modal-header">
@@ -118,84 +122,103 @@
     </div>
     <form id="citizenRegisterForm">
       <div class="form-row">
-        <div class="form-group"><label>पहला नाम *</label><input type="text" id="firstName" class="form-control" required></div>
-        <div class="form-group"><label>अंतिम नाम *</label><input type="text" id="lastName" class="form-control" required></div>
-      </div>
-      <div class="form-group"><label>पूरा नाम *</label><input type="text" id="fullName" class="form-control" required></div>
-      <div class="form-group"><label>शहर/जिला *</label><input type="text" id="city" class="form-control" required></div>
-      <div class="form-group"><label>Gmail *</label><input type="email" id="citizenEmail" class="form-control" required></div>
-      <div class="form-group"><label>मोबाइल नंबर *</label><input type="tel" id="citizenMobile" class="form-control" maxlength="10" required></div>
-      <div class="form-row">
-        <div class="form-group"><label>पासवर्ड *</label><input type="password" id="citizenPassword" class="form-control" required></div>
-        <div class="form-group"><label>पासवर्ड दोहराएं *</label><input type="password" id="confirmPassword" class="form-control" required></div>
-      </div>
-      <button type="button" class="btn-submit" onclick="sendRegisterOTP()">📧 Send OTP & Register</button>
-      <div id="registerOtpSection" style="display:none; margin-top:15px;">
-        <div class="form-group"><label>📱 OTP कोड</label><input type="text" id="registerOtp" class="form-control" maxlength="6"></div>
-        <div id="registerOtpMsg" class="otp-message"></div>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-          <button type="button" class="btn-verify" onclick="verifyRegisterOtp()">✅ Verify & Register</button>
-          <button type="button" class="btn-resend" onclick="resendRegisterOtp()">🔄 Resend</button>
+        <div class="form-group">
+          <label class="form-label">पहला नाम <span class="required">*</span></label>
+          <input type="text" id="firstName" class="form-control" placeholder="पहला नाम" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">अंतिम नाम <span class="required">*</span></label>
+          <input type="text" id="lastName" class="form-control" placeholder="अंतिम नाम" required>
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">पूरा नाम <span class="required">*</span></label>
+        <input type="text" id="fullName" class="form-control" placeholder="पूरा नाम" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">शहर / जिला <span class="required">*</span></label>
+        <input type="text" id="city" class="form-control" placeholder="जैसे: भोपाल, इंदौर" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gmail <span class="required">*</span></label>
+        <input type="email" id="citizenEmail" class="form-control" placeholder="yourname@gmail.com" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">मोबाइल नंबर <span class="required">*</span></label>
+        <input type="tel" id="citizenMobile" class="form-control" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">पासवर्ड <span class="required">*</span></label>
+          <input type="password" id="citizenPassword" class="form-control" placeholder="कम से कम 6 कैरेक्टर" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">पासवर्ड दोहराएं <span class="required">*</span></label>
+          <input type="password" id="confirmPassword" class="form-control" placeholder="पासवर्ड फिर लिखें" required>
+        </div>
+      </div>
+      
+      <!-- OTP Section -->
+      <div id="otpSection" class="otp-box">
+        <div class="form-group">
+          <label class="form-label">📱 OTP कोड</label>
+          <input type="text" id="otpInput" class="form-control" placeholder="6 अंकों का OTP दर्ज करें" maxlength="6">
+          <div id="otpMessage" style="font-size: 12px; margin-top: 5px;"></div>
+        </div>
+        <button type="button" class="btn-submit" onclick="verifyOTP()" style="background:#6B3FA0;">✅ Verify OTP & Register</button>
+        <button type="button" class="btn-sm" onclick="resendOTP()" style="background:#1A4FA0; margin-top: 10px; padding: 8px; width: 100%;">🔄 Resend OTP</button>
+      </div>
+      
+      <button type="button" class="btn-submit" id="sendOtpBtn" onclick="sendRegisterOTP()">📧 Send OTP & Register</button>
     </form>
   </div>
 </div>
 
-<!-- Forgot Password OTP Modal -->
-<div id="forgotOtpModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>🔐 पासवर्ड रीसेट</h2>
-      <button class="close-modal" onclick="closeForgotModal()">✕</button>
-    </div>
-    <div id="forgotStep1">
-      <div class="form-group"><label>📧 पंजीकृत Email</label><input type="email" id="resetEmail" class="form-control" placeholder="your@email.com"></div>
-      <div class="otp-buttons">
-        <button class="btn-send" onclick="sendForgotOtp()">📧 OTP भेजें</button>
-        <button class="btn-close" onclick="closeForgotModal()">✖ बंद करें</button>
-      </div>
-    </div>
-    <div id="forgotStep2" style="display:none;">
-      <div class="form-group"><label>📱 OTP कोड</label><input type="text" id="forgotOtp" class="form-control otp-pin-input" maxlength="6"></div>
-      <div id="forgotOtpMsg" class="otp-message"></div>
-      <div class="otp-buttons">
-        <button class="btn-resend" onclick="resendForgotOtp()">🔄 पुनः भेजें</button>
-        <button class="btn-verify" onclick="verifyForgotOtp()">✅ OTP Verify & Reset Password</button>
-        <button class="btn-close" onclick="closeForgotModal()">✖ बंद करें</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
-let resetEmail = '';
-let registerEmail = '', registerData = {};
+let registerData = {};
 
-function showAlert(msg,type){
+function showAlert(msg, type){
   const el = document.getElementById('alert-box');
   el.className = 'alert alert-'+type+' show';
   el.innerHTML = msg;
   setTimeout(() => el.className = 'alert', 5000);
 }
 
-async function doLogin(){
-  const email = document.getElementById('l-email').value.trim();
-  const pass = document.getElementById('l-pass').value;
-  if(!email||!pass){ showAlert('Email और पासवर्ड भरें','danger'); return; }
-  showAlert('⏳ Logging in...','info');
-  const res = await fetch('/api/citizen/login',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email,password:pass})
-  });
-  const data = await res.json();
-  if(data.success){
-    localStorage.setItem('citizen',JSON.stringify(data));
-    window.location='/citizen/dashboard';
-  } else { showAlert(data.message,'danger'); }
+function openRegisterModal(){
+  document.getElementById('registerModal').style.display = 'flex';
+  document.getElementById('citizenRegisterForm').reset();
+  document.getElementById('otpSection').classList.remove('show');
+  document.getElementById('sendOtpBtn').style.display = 'block';
 }
 
-// Register OTP
+function closeRegisterModal(){
+  document.getElementById('registerModal').style.display = 'none';
+}
+
+async function doLogin(){
+  const email = document.getElementById('l-email').value.trim();
+  const password = document.getElementById('l-pass').value;
+  if(!email || !password){ showAlert('Email और पासवर्ड भरें', 'danger'); return; }
+  
+  showAlert('⏳ Logging in...', 'info');
+  try {
+    const response = await fetch('/api/citizen/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await response.json();
+    if(data.success){
+      localStorage.setItem('citizen', JSON.stringify({name: data.name, email: data.email, mobile: data.mobile, city: data.city || ''}));
+      window.location = '/citizen/dashboard';
+    } else {
+      showAlert(data.message, 'danger');
+    }
+  } catch(error){
+    showAlert('Network error: ' + error.message, 'danger');
+  }
+}
+
 async function sendRegisterOTP(){
   const firstName = document.getElementById('firstName').value.trim();
   const lastName = document.getElementById('lastName').value.trim();
@@ -204,113 +227,110 @@ async function sendRegisterOTP(){
   const email = document.getElementById('citizenEmail').value.trim();
   const mobile = document.getElementById('citizenMobile').value.trim();
   const password = document.getElementById('citizenPassword').value;
-  const confirm = document.getElementById('confirmPassword').value;
-  if(!firstName||!lastName||!fullName||!city||!email||!mobile||!password) { showAlert('सभी फील्ड भरें','danger'); return; }
-  if(password.length<6){ showAlert('पासवर्ड 6+ कैरेक्टर','danger'); return; }
-  if(password!==confirm){ showAlert('पासवर्ड मेल नहीं खाते','danger'); return; }
-  if(mobile.length!==10){ showAlert('मोबाइल 10 अंक','danger'); return; }
-  registerData = {name:fullName, email:email.toLowerCase(), mobile, password, city};
-  registerEmail = email;
-  showAlert('⏳ Sending OTP...','info');
-  const res = await fetch('/api/otp/send',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email})
-  });
-  const data = await res.json();
-  if(data.success){
-    document.getElementById('registerOtpSection').style.display='block';
-    document.getElementById('registerOtpMsg').innerHTML = `<span class="success">✅ OTP sent! DEMO: ${data.otp}</span>`;
-    showAlert('OTP sent! Verify to complete registration.','success');
-  } else { showAlert('❌ '+data.message,'danger'); }
-}
-async function resendRegisterOtp(){
-  const res = await fetch('/api/otp/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:registerEmail})});
-  const data = await res.json();
-  if(data.success) document.getElementById('registerOtpMsg').innerHTML = `<span class="success">✅ OTP resent! DEMO: ${data.otp}</span>`;
-  else document.getElementById('registerOtpMsg').innerHTML = `<span class="error">❌ ${data.message}</span>`;
-}
-async function verifyRegisterOtp(){
-  const otp = document.getElementById('registerOtp').value.trim();
-  if(!otp||otp.length!==6){ showAlert('6 अंक OTP दर्ज करें','danger'); return; }
-  const verify = await fetch('/api/otp/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:registerEmail,otp})});
-  const vdata = await verify.json();
-  if(!vdata.success){ document.getElementById('registerOtpMsg').innerHTML = `<span class="error">❌ ${vdata.message}</span>`; return; }
-  const reg = await fetch('/api/citizen/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(registerData)});
-  const regData = await reg.json();
-  if(regData.success){
-    showAlert('✅ Registration successful! Login now.','success');
-    closeRegisterModal();
-    document.getElementById('l-email').value = registerEmail;
-  } else { showAlert('❌ '+regData.message,'danger'); }
-}
-function openRegisterModal(){
-  document.getElementById('registerModal').style.display='flex';
-  document.getElementById('citizenRegisterForm').reset();
-  document.getElementById('registerOtpSection').style.display='none';
-}
-function closeRegisterModal(){ document.getElementById('registerModal').style.display='none'; }
-
-// Forgot Password OTP
-function openForgotPassword(){
-  document.getElementById('forgotOtpModal').style.display='flex';
-  document.getElementById('forgotStep1').style.display='block';
-  document.getElementById('forgotStep2').style.display='none';
-  document.getElementById('resetEmail').value = document.getElementById('l-email').value.trim();
-}
-function closeForgotModal(){ document.getElementById('forgotOtpModal').style.display='none'; }
-async function sendForgotOtp(){
-  const email = document.getElementById('resetEmail').value.trim();
-  if(!email){ showAlert('Email दर्ज करें','danger'); return; }
-  resetEmail = email;
-  const msgDiv = document.getElementById('forgotOtpMsg');
-  msgDiv.className = 'otp-message info';
-  msgDiv.innerHTML = '⏳ Sending OTP...';
-  const res = await fetch('/api/otp/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-  const data = await res.json();
-  if(data.success){
-    document.getElementById('forgotStep1').style.display='none';
-    document.getElementById('forgotStep2').style.display='block';
-    msgDiv.className = 'otp-message success';
-    msgDiv.innerHTML = `✅ OTP sent! DEMO: <strong style="font-size:24px;">${data.otp}</strong>`;
-  } else {
-    msgDiv.className = 'otp-message error';
-    msgDiv.innerHTML = '❌ '+data.message;
-  }
-}
-async function resendForgotOtp(){
-  const msgDiv = document.getElementById('forgotOtpMsg');
-  msgDiv.className = 'otp-message info';
-  msgDiv.innerHTML = '⏳ Resending...';
-  const res = await fetch('/api/otp/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail})});
-  const data = await res.json();
-  if(data.success){
-    msgDiv.className = 'otp-message success';
-    msgDiv.innerHTML = `✅ OTP resent! DEMO: ${data.otp}`;
-  } else {
-    msgDiv.className = 'otp-message error';
-    msgDiv.innerHTML = '❌ '+data.message;
-  }
-}
-async function verifyForgotOtp(){
-  const otp = document.getElementById('forgotOtp').value.trim();
-  if(!otp||otp.length!==6){ document.getElementById('forgotOtpMsg').innerHTML = '<span class="error">❌ 6 अंक OTP दर्ज करें</span>'; return; }
-  const verify = await fetch('/api/otp/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,otp})});
-  const vdata = await verify.json();
-  if(!vdata.success){ document.getElementById('forgotOtpMsg').innerHTML = `<span class="error">❌ ${vdata.message}</span>`; return; }
-  const newPass = prompt('🔐 नया पासवर्ड (6+ characters):');
-  if(!newPass||newPass.length<6){ alert('पासवर्ड 6+ character'); return; }
-  const reset = await fetch('/api/citizen/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,new_password:newPass})});
-  const rdata = await reset.json();
-  if(rdata.success){
-    document.getElementById('forgotOtpMsg').innerHTML = '<span class="success">✅ Password reset! Login now.</span>';
-    setTimeout(()=>{ closeForgotModal(); document.getElementById('l-pass').value=''; document.getElementById('l-email').value=resetEmail; },1500);
-  } else {
-    document.getElementById('forgotOtpMsg').innerHTML = `<span class="error">❌ ${rdata.message}</span>`;
+  const confirmPass = document.getElementById('confirmPassword').value;
+  
+  if(!firstName){ showAlert('❌ पहला नाम भरें', 'danger'); return; }
+  if(!lastName){ showAlert('❌ अंतिम नाम भरें', 'danger'); return; }
+  if(!fullName){ showAlert('❌ पूरा नाम भरें', 'danger'); return; }
+  if(!city){ showAlert('❌ शहर भरें', 'danger'); return; }
+  if(!email){ showAlert('❌ Email भरें', 'danger'); return; }
+  if(!email.includes('@')){ showAlert('❌ सही Email दें', 'danger'); return; }
+  if(!mobile){ showAlert('❌ मोबाइल नंबर भरें', 'danger'); return; }
+  if(mobile.length !== 10){ showAlert('❌ मोबाइल नंबर 10 अंकों का होना चाहिए', 'danger'); return; }
+  if(!password){ showAlert('❌ पासवर्ड भरें', 'danger'); return; }
+  if(password.length < 6){ showAlert('❌ पासवर्ड कम से कम 6 कैरेक्टर', 'danger'); return; }
+  if(password !== confirmPass){ showAlert('❌ पासवर्ड मेल नहीं खाते', 'danger'); return; }
+  
+  registerData = { name: fullName, email: email, mobile: mobile, password: password, city: city };
+  
+  showAlert('⏳ Sending OTP...', 'info');
+  try {
+    const response = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    });
+    const data = await response.json();
+    if(data.success){
+      document.getElementById('otpSection').classList.add('show');
+      document.getElementById('sendOtpBtn').style.display = 'none';
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP भेजा गया! DEMO OTP: <strong style="font-size: 24px;">${data.otp}</strong></span>`;
+      showAlert('✅ OTP sent! Enter OTP to complete registration.', 'success');
+    } else {
+      showAlert('❌ ' + data.message, 'danger');
+    }
+  } catch(error){
+    showAlert('❌ Network error: ' + error.message, 'danger');
   }
 }
 
-document.addEventListener('DOMContentLoaded',function(){
-  if(typeof initChatbot==='function') initChatbot('guest','guest','');
+async function resendOTP(){
+  showAlert('⏳ Resending OTP...', 'info');
+  try {
+    const response = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: registerData.email })
+    });
+    const data = await response.json();
+    if(data.success){
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP पुनः भेजा गया! DEMO OTP: <strong style="font-size: 24px;">${data.otp}</strong></span>`;
+      showAlert('✅ OTP resent!', 'success');
+    } else {
+      showAlert('❌ ' + data.message, 'danger');
+    }
+  } catch(error){
+    showAlert('❌ Network error: ' + error.message, 'danger');
+  }
+}
+
+async function verifyOTP(){
+  const otp = document.getElementById('otpInput').value.trim();
+  if(!otp || otp.length !== 6){
+    showAlert('❌ 6 अंकों का OTP दर्ज करें', 'danger');
+    return;
+  }
+  
+  showAlert('⏳ Verifying OTP...', 'info');
+  try {
+    const verifyResponse = await fetch('/api/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: registerData.email, otp: otp })
+    });
+    const verifyData = await verifyResponse.json();
+    if(!verifyData.success){
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #C0392B;">❌ ${verifyData.message}</span>`;
+      showAlert('❌ ' + verifyData.message, 'danger');
+      return;
+    }
+    
+    // Register user
+    const registerResponse = await fetch('/api/citizen/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registerData)
+    });
+    const registerDataRes = await registerResponse.json();
+    
+    if(registerDataRes.success){
+      showAlert('✅ ' + registerDataRes.message, 'success');
+      closeRegisterModal();
+      document.getElementById('l-email').value = registerData.email;
+      document.getElementById('l-pass').value = '';
+      showAlert('✅ Registration successful! Please login with your password.', 'success');
+    } else {
+      showAlert('❌ ' + registerDataRes.message, 'danger');
+    }
+  } catch(error){
+    showAlert('❌ Network error: ' + error.message, 'danger');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if(typeof initChatbot === 'function') {
+    initChatbot('guest', 'guest', '');
+  }
 });
 </script>
 <script src="/static/js/chatbot.js"></script>
