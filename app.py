@@ -1,5 +1,4 @@
 import os
-import re
 import secrets
 import hashlib
 import datetime
@@ -7,89 +6,18 @@ import random
 import sqlite3
 from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
-from functools import wraps
-from time import time
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-CORS(app, supports_credentials=True)
+CORS(app)
 
-# ==============================================
-# CONFIGURATION
-# ==============================================
 PORT = int(os.environ.get('PORT', 10000))
 BASE_URL = os.environ.get('BASE_URL', 'https://grievai-system.onrender.com')
-DB_PATH = os.path.join(os.path.dirname(__file__), 'grievai.db')
+DB_PATH = 'grievai.db'
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 OTP_STORE = {}
-
-# ==============================================
-# OTP FUNCTIONS
-# ==============================================
-
-def generate_otp():
-    return ''.join(random.choices('0123456789', k=6))
-
-def send_otp_email(email, otp):
-    api_key = os.environ.get('RESEND_API_KEY', '')
-    
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial; text-align: center; background: #f4f6fb; padding: 20px;">
-        <div style="max-width: 450px; margin: auto; background: white; border-radius: 16px; padding: 30px;">
-            <div style="background: linear-gradient(135deg,#1B8A4E,#0E6B6B); padding: 15px; border-radius: 12px;">
-                <h1 style="color: white; margin: 0;">🏛️ GrievAI</h1>
-                <p style="color: rgba(255,255,255,0.9);">मध्य प्रदेश सरकार</p>
-            </div>
-            <h2 style="color: #1B8A4E;">नमस्ते! 👋</h2>
-            <p>आपका OTP कोड नीचे दिया गया है:</p>
-            <div style="background: #000000; color: #FFD700; font-size: 36px; font-weight: bold; padding: 15px; border-radius: 10px; letter-spacing: 5px; margin: 20px 0;">
-                {otp}
-            </div>
-            <p style="color: #888; font-size: 12px;">⚠️ यह OTP <strong>10 मिनट</strong> के लिए वैध है।</p>
-        </div>
-    </body>
-    </html>
-    """
-    
-    if not api_key:
-        print(f"\n⚠️ RESEND_API_KEY not set! OTP in logs only.")
-        print(f"📧 OTP for {email}: {otp}\n")
-        return
-    
-    try:
-        import requests
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "from": "GrievAI <onboarding@resend.dev>",
-                "to": email,
-                "subject": "GrievAI - Your OTP Code",
-                "html": html_content
-            }
-        )
-        if response.status_code == 200:
-            print(f"✅ OTP email sent to {email}")
-        else:
-            print(f"❌ Failed to send OTP to {email}")
-            print(f"📧 OTP for {email}: {otp}")
-    except Exception as e:
-        print(f"❌ Email error: {e}")
-        print(f"📧 OTP for {email}: {otp}")
-
-# ==============================================
-# DATABASE FUNCTIONS
-# ==============================================
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -100,111 +28,45 @@ def hash_password(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
 def generate_complaint_id():
-    now = datetime.datetime.now()
-    rand = ''.join(random.choices('0123456789', k=4))
-    return f"GRV{now.strftime('%y%m%d')}{rand}"
-
-def create_notification(user_email, user_type, title, message, link=''):
-    """Create a notification for user"""
-    try:
-        conn = get_db()
-        conn.execute('''INSERT INTO notifications (user_email, user_type, title, message, link, is_read, created_at) 
-                       VALUES (?,?,?,?,?,0, CURRENT_TIMESTAMP)''',
-                    (user_email, user_type, title, message, link))
-        conn.commit()
-        conn.close()
-        print(f"🔔 Notification created for {user_email}: {title}")
-    except Exception as e:
-        print(f"Notification error: {e}")
-
-# ==============================================
-# INIT DATABASE
-# ==============================================
+    return f"GRV{datetime.datetime.now().strftime('%y%m%d')}{''.join(random.choices('0123456789', k=4))}"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    print("📦 Creating tables...")
-    
     c.execute('''CREATE TABLE IF NOT EXISTS citizens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL, 
-        email TEXT UNIQUE NOT NULL,
-        mobile TEXT NOT NULL, 
-        password TEXT NOT NULL,
-        city TEXT DEFAULT '',
-        is_verified INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    print("✓ citizens table ready")
+        name TEXT, email TEXT UNIQUE, mobile TEXT, password TEXT, city TEXT,
+        is_verified INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS departments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        dept_name TEXT NOT NULL, 
-        officer_name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL, 
-        password TEXT NOT NULL,
-        mobile TEXT DEFAULT '',
-        city TEXT DEFAULT '',
-        is_verified INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    print("✓ departments table ready")
+        dept_name TEXT, officer_name TEXT, email TEXT UNIQUE, password TEXT,
+        mobile TEXT, city TEXT, is_verified INTEGER DEFAULT 1)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS complaints (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id TEXT UNIQUE NOT NULL,
-        citizen_name TEXT NOT NULL, 
-        citizen_email TEXT NOT NULL,
-        mobile TEXT NOT NULL, 
-        complaint_text TEXT NOT NULL,
-        department TEXT NOT NULL, 
-        status TEXT DEFAULT 'pending',
-        photo_path TEXT DEFAULT NULL, 
-        voice_path TEXT DEFAULT NULL,
-        latitude REAL DEFAULT NULL, 
-        longitude REAL DEFAULT NULL,
-        address TEXT DEFAULT NULL,
-        city TEXT DEFAULT '',
+        complaint_id TEXT UNIQUE, citizen_name TEXT, citizen_email TEXT,
+        mobile TEXT, complaint_text TEXT, department TEXT, status TEXT DEFAULT 'pending',
+        photo_path TEXT, voice_path TEXT, latitude REAL, longitude REAL, address TEXT, city TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    print("✓ complaints table ready")
     
-    c.execute("DROP TABLE IF EXISTS feedback")
-    print("✓ old feedback table dropped")
-    
-    c.execute('''CREATE TABLE feedback (
+    c.execute('''CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id TEXT NOT NULL,
-        citizen_name TEXT NOT NULL,
-        citizen_email TEXT NOT NULL,
-        department TEXT NOT NULL,
-        rating INTEGER DEFAULT 0,
-        message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    print("✓ feedback table created")
+        complaint_id TEXT, citizen_name TEXT, citizen_email TEXT,
+        department TEXT, rating INTEGER, message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_email TEXT NOT NULL,
-        user_type TEXT NOT NULL,
-        title TEXT NOT NULL,
-        message TEXT NOT NULL,
-        link TEXT DEFAULT '',
-        is_read INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    print("✓ notifications table ready")
+        user_email TEXT, user_type TEXT, title TEXT, message TEXT,
+        link TEXT, is_read INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        mobile TEXT DEFAULT '',
-        role TEXT DEFAULT 'admin',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    print("✓ admins table ready")
+        name TEXT, email TEXT UNIQUE, password TEXT, role TEXT DEFAULT 'admin')''')
     
+    # Clear and insert default data
     c.execute("DELETE FROM departments")
     c.execute("DELETE FROM citizens")
     c.execute("DELETE FROM admins")
@@ -216,834 +78,270 @@ def init_db():
         ('Sanitation','Dinesh Kumar','sanitation@grievai.com',hash_password('Sanitation123'),'9876543204','Bhopal',1),
         ('Healthcare','Rakesh Singh','healthcare@grievai.com',hash_password('Healthcare123'),'9876543205','Bhopal',1),
     ]
-    
     for d in default_depts:
-        try:
-            c.execute('''INSERT INTO departments 
-                (dept_name, officer_name, email, password, mobile, city, is_verified) 
-                VALUES (?,?,?,?,?,?,?)''', d)
-            print(f"✓ Department added: {d[0]}")
-        except:
-            pass
+        c.execute('INSERT INTO departments VALUES (?,?,?,?,?,?,?)', d)
     
-    try:
-        c.execute('''INSERT OR IGNORE INTO admins (name, email, password, mobile, role) 
-                     VALUES (?,?,?,?,?)''',
-                  ('Super Admin', 'admin@grievai.com', hash_password('admin123'), '9999999999', 'super_admin'))
-        print("✓ Admin created: admin@grievai.com / admin123")
-    except:
-        pass
-    
-    try:
-        c.execute('''INSERT OR IGNORE INTO citizens (name, email, mobile, password, city, is_verified) 
-                     VALUES (?,?,?,?,?,?)''',
-                  ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
-        print("✓ Test citizen added: test@citizen.com / test123")
-    except:
-        pass
+    c.execute("INSERT INTO admins VALUES (1,'Super Admin','admin@grievai.com',?,'super_admin')", (hash_password('admin123'),))
+    c.execute("INSERT INTO citizens VALUES (1,'Test Citizen','test@citizen.com','9999999999',?,'Bhopal',1,CURRENT_TIMESTAMP)", (hash_password('test123'),))
     
     conn.commit()
     conn.close()
-    print("✅ Database initialized successfully!")
+    print("✅ Database ready!")
 
-# ==============================================
-# PAGES
-# ==============================================
+init_db()
 
-@app.route('/') 
-def index(): 
-    return render_template('index.html')
-
-@app.route('/citizen') 
-def citizen_page(): 
-    return render_template('citizen_login.html')
-
-@app.route('/citizen/dashboard') 
-def citizen_dash(): 
-    return render_template('citizen_dashboard.html')
-
-@app.route('/department') 
-def dept_page(): 
-    return render_template('dept_login.html')
-
-@app.route('/department/dashboard') 
-def dept_dash(): 
-    return render_template('dept_dashboard.html')
-
-@app.route('/admin') 
-def admin_page(): 
-    return render_template('admin_login.html')
-
-@app.route('/admin/dashboard') 
-def admin_dash(): 
-    return render_template('admin_dashboard.html')
-
+@app.route('/')
+def index(): return render_template('index.html')
+@app.route('/citizen')
+def citizen_page(): return render_template('citizen_login.html')
+@app.route('/citizen/dashboard')
+def citizen_dash(): return render_template('citizen_dashboard.html')
+@app.route('/department')
+def dept_page(): return render_template('dept_login.html')
+@app.route('/department/dashboard')
+def dept_dash(): return render_template('dept_dashboard.html')
+@app.route('/admin')
+def admin_page(): return render_template('admin_login.html')
+@app.route('/admin/dashboard')
+def admin_dash(): return render_template('admin_dashboard.html')
 @app.route('/faq')
-def faq_page():
-    return render_template('faq.html')
-
+def faq_page(): return render_template('faq.html')
 @app.route('/instructions')
-def instructions_page():
-    return render_template('instructions.html')
+def instructions_page(): return render_template('instructions.html')
 
-# ==============================================
-# API: SEND OTP
-# ==============================================
-
-@app.route('/api/send-otp', methods=['POST'])
-def send_otp():
-    data = request.json
-    email = data.get('email', '').strip().lower()
-    
-    if not email:
-        return jsonify({'success': False, 'message': 'Email is required'})
-    
-    conn = get_db()
-    existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
-    
-    if existing and existing['is_verified'] == 1:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Email already registered and verified! Please login.'})
-    
-    conn.close()
-    
-    otp = generate_otp()
-    OTP_STORE[email] = {
-        'otp': otp,
-        'expires': datetime.datetime.now() + datetime.timedelta(minutes=10)
-    }
-    
-    send_otp_email(email, otp)
-    
-    print(f"\n{'='*40}")
-    print(f"[OTP] New registration for {email} => {otp}")
-    print(f"{'='*40}\n")
-    
-    return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent successfully!'})
-
-# ==============================================
-# API: VERIFY OTP
-# ==============================================
-
-@app.route('/api/verify-otp', methods=['POST'])
-def verify_otp():
-    data = request.json
-    email = data.get('email', '').strip().lower()
-    otp = data.get('otp', '').strip()
-    
-    if not email or not otp:
-        return jsonify({'success': False, 'message': 'Email and OTP required'})
-    
-    stored = OTP_STORE.get(email)
-    
-    if not stored:
-        return jsonify({'success': False, 'message': 'OTP not requested or expired'})
-    
-    if datetime.datetime.now() > stored['expires']:
-        del OTP_STORE[email]
-        return jsonify({'success': False, 'message': 'OTP expired!'})
-    
-    if stored['otp'] != otp:
-        return jsonify({'success': False, 'message': 'Invalid OTP!'})
-    
-    return jsonify({'success': True, 'message': 'OTP verified!'})
-
-# ==============================================
-# API: CITIZEN REGISTER
-# ==============================================
-
+# ============== AUTH ==============
 @app.route('/api/citizen/register', methods=['POST'])
-def citizen_register():
+def register():
     data = request.json
-    name = data.get('name', '').strip()
-    email = data.get('email', '').strip().lower()
-    mobile = data.get('mobile', '').strip()
-    password = data.get('password', '')
-    city = data.get('city', '').strip()
-    
-    if not all([name, email, mobile, password]):
-        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
-    if len(password) < 6:
-        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
-    if len(mobile) != 10 or not mobile.isdigit():
-        return jsonify({'success': False, 'message': 'मोबाइल नंबर 10 अंकों का होना चाहिए'})
-    
-    conn = get_db()
-    
-    existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
-    
-    if existing:
-        if existing['is_verified'] == 1:
-            conn.close()
-            return jsonify({'success': False, 'message': 'Email already registered and verified!'})
-        else:
-            conn.execute('''UPDATE citizens SET name=?, mobile=?, password=?, city=?, is_verified=1 
-                           WHERE email=?''', (name, mobile, hash_password(password), city, email))
-            print(f"🔄 Updated and verified user: {email}")
-    else:
-        conn.execute('''INSERT INTO citizens (name, email, mobile, password, city, is_verified) 
-                       VALUES (?,?,?,?,?,1)''',
-                     (name, email, mobile, hash_password(password), city))
-        print(f"📝 Created new verified user: {email}")
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True, 'message': 'Registration successful! You can now login.'})
-
-# ==============================================
-# API: CITIZEN LOGIN
-# ==============================================
+    try:
+        conn = get_db()
+        conn.execute("INSERT INTO citizens (name, email, mobile, password, city, is_verified) VALUES (?,?,?,?,?,1)",
+                    (data['name'], data['email'], data['mobile'], hash_password(data['password']), data.get('city', '')))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Registration successful!'})
+    except:
+        return jsonify({'success': False, 'message': 'Email already exists!'})
 
 @app.route('/api/citizen/login', methods=['POST'])
-def citizen_login():
+def login():
     data = request.json
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    
-    print(f"🔐 Login attempt - Email: {email}")
-    
     conn = get_db()
-    row = conn.execute('SELECT * FROM citizens WHERE email=? AND password=?', 
-                       (email, hash_password(password))).fetchone()
-    
-    if not row:
-        conn.close()
-        print(f"❌ Login failed - User not found")
-        return jsonify({'success': False, 'message': 'Email या पासवर्ड गलत है'})
-    
-    if row['is_verified'] == 0:
-        conn.close()
-        print(f"❌ Login failed - Email not verified")
-        return jsonify({'success': False, 'not_verified': True, 'message': '❌ Please verify your email!'})
-    
+    row = conn.execute("SELECT * FROM citizens WHERE email=? AND password=?", 
+                      (data['email'], hash_password(data['password']))).fetchone()
     conn.close()
-    print(f"✅ Login successful for {email}")
-    
-    session['citizen_logged_in'] = True
-    session['citizen_email'] = row['email']
-    session['citizen_name'] = row['name']
-    
-    return jsonify({'success': True, 'name': row['name'], 'email': row['email'], 'mobile': row['mobile'], 'city': row['city'] or ''})
+    if row:
+        session['citizen_logged_in'] = True
+        session['citizen_email'] = row['email']
+        session['citizen_name'] = row['name']
+        return jsonify({'success': True, 'name': row['name'], 'email': row['email'], 'mobile': row['mobile'], 'city': row['city'] or ''})
+    return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
 @app.route('/api/citizen/logout', methods=['POST'])
-def citizen_logout():
-    session.pop('citizen_logged_in', None)
-    session.pop('citizen_email', None)
-    session.pop('citizen_name', None)
-    return jsonify({'success': True, 'message': 'Logged out'})
+def logout():
+    session.clear()
+    return jsonify({'success': True})
 
-@app.route('/api/citizen/reset-password', methods=['POST'])
-def citizen_reset():
-    data = request.json
-    email = data.get('email', '').strip().lower()
-    new_pass = data.get('new_password', '')
-    
-    if len(new_pass) < 6:
-        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
-    
-    conn = get_db()
-    result = conn.execute('UPDATE citizens SET password=? WHERE email=?', 
-                         (hash_password(new_pass), email))
-    conn.commit()
-    conn.close()
-    
-    if result.rowcount == 0:
-        return jsonify({'success': False, 'message': 'Email नहीं मिला'})
-    
-    return jsonify({'success': True, 'message': 'पासवर्ड बदल गया!'})
-
-# ==============================================
-# API: CHANGE PASSWORD (PROFILE)
-# ==============================================
-
+# ============== PROFILE ==============
 @app.route('/api/citizen/change-password', methods=['POST'])
 def change_password():
     data = request.json
-    email = data.get('email', '').strip().lower()
-    old_password = data.get('old_password', '')
-    new_password = data.get('new_password', '')
-    
-    if not old_password or not new_password:
-        return jsonify({'success': False, 'message': 'Old and new password required'})
-    
-    if len(new_password) < 6:
-        return jsonify({'success': False, 'message': 'New password must be at least 6 characters'})
-    
     conn = get_db()
-    
-    user = conn.execute('SELECT * FROM citizens WHERE email = ? AND password = ?', 
-                       (email, hash_password(old_password))).fetchone()
-    
+    user = conn.execute("SELECT * FROM citizens WHERE email=? AND password=?", 
+                       (data['email'], hash_password(data['old_password']))).fetchone()
     if not user:
         conn.close()
-        return jsonify({'success': False, 'message': 'Current password is incorrect!'})
-    
-    conn.execute('UPDATE citizens SET password = ? WHERE email = ?', 
-                (hash_password(new_password), email))
+        return jsonify({'success': False, 'message': 'Current password incorrect!'})
+    conn.execute("UPDATE citizens SET password=? WHERE email=?", (hash_password(data['new_password']), data['email']))
     conn.commit()
     conn.close()
-    
-    create_notification(email, 'citizen', 'Password Changed', 'Your password has been changed successfully.')
-    
-    return jsonify({'success': True, 'message': 'Password changed successfully!'})
-
-# ==============================================
-# API: GET CITIZEN PROFILE
-# ==============================================
+    return jsonify({'success': True, 'message': 'Password changed!'})
 
 @app.route('/api/citizen/profile', methods=['GET'])
-def get_citizen_profile():
-    email = request.args.get('email', '').strip().lower()
-    
+def profile():
+    email = request.args.get('email')
     conn = get_db()
-    user = conn.execute('SELECT id, name, email, mobile, city, is_verified, created_at FROM citizens WHERE email = ?', (email,)).fetchone()
+    user = conn.execute("SELECT name, email, mobile, city FROM citizens WHERE email=?", (email,)).fetchone()
     conn.close()
-    
-    if not user:
-        return jsonify({'success': False, 'message': 'User not found'})
-    
-    return jsonify({
-        'success': True,
-        'profile': {
-            'id': user['id'],
-            'name': user['name'],
-            'email': user['email'],
-            'mobile': user['mobile'],
-            'city': user['city'],
-            'is_verified': user['is_verified'],
-            'member_since': user['created_at'][:10] if user['created_at'] else 'N/A'
-        }
-    })
+    return jsonify({'success': True, 'profile': dict(user)})
 
-# ==============================================
-# API: NOTIFICATIONS
-# ==============================================
-
-@app.route('/api/notifications', methods=['GET'])
-def get_notifications():
-    email = request.args.get('email', '').strip().lower()
-    user_type = request.args.get('user_type', 'citizen')
-    
-    if not email:
-        return jsonify({'success': True, 'notifications': [], 'unread_count': 0})
-    
-    conn = get_db()
-    try:
-        notifications = conn.execute('''SELECT * FROM notifications 
-                                        WHERE user_email = ? AND user_type = ? 
-                                        ORDER BY created_at DESC LIMIT 50''',
-                                    (email, user_type)).fetchall()
-        unread_count = conn.execute('''SELECT COUNT(*) FROM notifications 
-                                       WHERE user_email = ? AND user_type = ? AND is_read = 0''',
-                                   (email, user_type)).fetchone()[0]
-    except:
-        notifications = []
-        unread_count = 0
-    conn.close()
-    
-    return jsonify({
-        'success': True,
-        'notifications': [dict(n) for n in notifications],
-        'unread_count': unread_count
-    })
-
-@app.route('/api/notifications/mark-read', methods=['POST'])
-def mark_notification_read():
-    data = request.json
-    notification_id = data.get('notification_id')
-    email = data.get('email', '').strip().lower()
-    
-    conn = get_db()
-    conn.execute('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_email = ?', 
-                (notification_id, email))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True, 'message': 'Notification marked as read'})
-
-@app.route('/api/notifications/mark-all-read', methods=['POST'])
-def mark_all_notifications_read():
-    data = request.json
-    email = data.get('email', '').strip().lower()
-    user_type = data.get('user_type', 'citizen')
-    
-    conn = get_db()
-    conn.execute('UPDATE notifications SET is_read = 1 WHERE user_email = ? AND user_type = ?', 
-                (email, user_type))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True, 'message': 'All notifications marked as read'})
-
-# ==============================================
-# API: FEEDBACK ROUTES
-# ==============================================
-
-@app.route('/api/get-complaint-for-feedback', methods=['POST'])
-def get_complaint_for_feedback():
-    data = request.json
-    complaint_id = data.get('complaint_id', '').strip().upper()
-    email = data.get('email', '').strip().lower()
-    
-    conn = get_db()
-    try:
-        complaint = conn.execute('''SELECT * FROM complaints 
-                                    WHERE complaint_id = ? AND citizen_email = ?''', 
-                                    (complaint_id, email)).fetchone()
-        
-        if not complaint:
-            conn.close()
-            return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
-        
-        existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
-        conn.close()
-        
-        if existing:
-            return jsonify({'success': False, 'message': 'Feedback already submitted for this complaint!'})
-        
-        return jsonify({
-            'success': True,
-            'complaint_id': complaint['complaint_id'],
-            'department': complaint['department'],
-            'status': complaint['status'],
-            'date': complaint['created_at'][:10] if complaint['created_at'] else 'N/A'
-        })
-    except Exception as e:
-        conn.close()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/submit-feedback', methods=['POST'])
-def submit_complaint_feedback():
-    data = request.json
-    complaint_id = data.get('complaint_id', '').strip().upper()
-    citizen_email = data.get('citizen_email', '').strip().lower()
-    citizen_name = data.get('citizen_name', '')
-    department = data.get('department', '')
-    rating = data.get('rating', 0)
-    message = data.get('message', '').strip()
-    
-    if not complaint_id or not message:
-        return jsonify({'success': False, 'message': 'Complaint ID and feedback message required'})
-    
-    if rating < 1 or rating > 5:
-        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'})
-    
-    conn = get_db()
-    
-    complaint = conn.execute('SELECT * FROM complaints WHERE complaint_id = ? AND citizen_email = ?', 
-                            (complaint_id, citizen_email)).fetchone()
-    
-    if not complaint:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Complaint not found!'})
-    
-    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
-    
-    if existing:
-        conn.close()
-        return jsonify({'success': False, 'message': 'Feedback already submitted!'})
-    
-    conn.execute('''INSERT INTO feedback 
-                    (complaint_id, citizen_name, citizen_email, department, rating, message) 
-                    VALUES (?,?,?,?,?,?)''',
-                 (complaint_id, citizen_name, citizen_email, department, rating, message))
-    conn.commit()
-    conn.close()
-    
-    create_notification(department, 'department', 'New Feedback Received', 
-                       f'New feedback received for complaint {complaint_id} with rating {rating}/5',
-                       f'/department/dashboard?tab=feedback')
-    
-    return jsonify({'success': True, 'message': 'Feedback submitted successfully! Thank you!'})
-
-@app.route('/api/my-feedbacks', methods=['GET'])
-def get_my_feedbacks():
-    email = request.args.get('email', '').strip().lower()
-    
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
-                                FROM feedback f 
-                                JOIN complaints c ON f.complaint_id = c.complaint_id
-                                WHERE f.citizen_email = ? 
-                                ORDER BY f.created_at DESC''', (email,)).fetchall()
-    conn.close()
-    
-    return jsonify([dict(f) for f in feedbacks])
-
-@app.route('/api/dept-feedbacks', methods=['GET'])
-def get_dept_feedbacks():
-    dept = request.args.get('department', '').strip()
-    
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT * FROM feedback 
-                                WHERE department = ? 
-                                ORDER BY created_at DESC''', (dept,)).fetchall()
-    conn.close()
-    
-    return jsonify([dict(f) for f in feedbacks])
-
-@app.route('/api/all-feedbacks', methods=['GET'])
-def get_all_feedbacks():
-    conn = get_db()
-    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
-                                FROM feedback f 
-                                JOIN complaints c ON f.complaint_id = c.complaint_id
-                                ORDER BY f.created_at DESC''').fetchall()
-    
-    stats = conn.execute('''SELECT 
-                            department,
-                            COUNT(*) as total,
-                            AVG(rating) as avg_rating,
-                            SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as satisfied,
-                            SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as dissatisfied
-                            FROM feedback 
-                            GROUP BY department''').fetchall()
-    conn.close()
-    
-    return jsonify({
-        'feedbacks': [dict(f) for f in feedbacks],
-        'stats': [dict(s) for s in stats]
-    })
-
-# ==============================================
-# API: OTP (for password reset)
-# ==============================================
-
-@app.route('/api/otp/send', methods=['POST'])
-def send_otp_legacy():
-    data = request.json
-    target = data.get('target', '').strip()
-    
-    if not target:
-        return jsonify({'success': False, 'message': 'Mobile or Email required'})
-    
-    otp = generate_otp()
-    OTP_STORE[target] = {'otp': otp, 'expires': datetime.datetime.now() + datetime.timedelta(minutes=10)}
-    
-    print(f"\n{'='*40}")
-    print(f"[OTP] {target} => {otp}")
-    print(f"{'='*40}\n")
-    
-    return jsonify({'success': True, 'otp': otp, 'message': 'OTP generated!'})
-
-@app.route('/api/otp/verify', methods=['POST'])
-def verify_otp_legacy():
-    data = request.json
-    target = data.get('target', '').strip()
-    otp_in = data.get('otp', '').strip()
-    
-    if target not in OTP_STORE:
-        return jsonify({'success': False, 'message': 'OTP not requested'})
-    
-    entry = OTP_STORE[target]
-    if datetime.datetime.now() > entry['expires']:
-        del OTP_STORE[target]
-        return jsonify({'success': False, 'message': 'OTP expired'})
-    
-    if entry['otp'] != otp_in:
-        return jsonify({'success': False, 'message': 'Wrong OTP'})
-    
-    del OTP_STORE[target]
-    return jsonify({'success': True, 'message': 'OTP verified!'})
-
-# ==============================================
-# API: COMPLAINTS
-# ==============================================
-
+# ============== COMPLAINTS ==============
 @app.route('/api/complaints', methods=['POST'])
 def file_complaint():
     try:
-        citizen_name = request.form.get('citizen_name', '').strip()
-        citizen_email = request.form.get('citizen_email', '').strip().lower()
-        mobile = request.form.get('mobile', '').strip()
-        complaint_text = request.form.get('complaint_text', '').strip()
-        department = request.form.get('department', '').strip()
-        latitude = request.form.get('latitude')
-        longitude = request.form.get('longitude')
-        address = request.form.get('address', '')
-        city = request.form.get('city', '')
-        
-        voice_path = None
-        if 'voice' in request.files:
-            voice_file = request.files['voice']
-            if voice_file and voice_file.filename:
-                fname = f"voice_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.webm"
-                voice_file.save(os.path.join(UPLOAD_FOLDER, fname))
-                voice_path = fname
-        
-        photo_path = None
-        if 'photo' in request.files:
-            photo_file = request.files['photo']
-            if photo_file and photo_file.filename:
-                ext = photo_file.filename.rsplit('.', 1)[-1].lower() if '.' in photo_file.filename else 'jpg'
-                fname = f"photo_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-                photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
-                photo_path = fname
-        
-        if not all([citizen_name, citizen_email, department]):
-            return jsonify({'success': False, 'message': 'सभी जरूरी फील्ड भरें'})
-        if not complaint_text:
-            complaint_text = '[Media Complaint]'
-        
         cid = generate_complaint_id()
         conn = get_db()
-        conn.execute('''INSERT INTO complaints
-            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, 
-             photo_path, voice_path, latitude, longitude, address, city)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
-            (cid, citizen_name, citizen_email, mobile, complaint_text, department,
-             photo_path, voice_path, latitude, longitude, address, city))
+        conn.execute("""INSERT INTO complaints 
+            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, latitude, longitude, address, city, photo_path, voice_path)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (cid, request.form['citizen_name'], request.form['citizen_email'], request.form['mobile'],
+             request.form['complaint_text'], request.form['department'],
+             request.form.get('latitude'), request.form.get('longitude'), request.form.get('address', ''),
+             request.form.get('city', ''), None, None))
         conn.commit()
         conn.close()
-        
-        return jsonify({'success': True, 'complaint_id': cid, 'message': 'शिकायत दर्ज हो गई!'})
-        
+        return jsonify({'success': True, 'complaint_id': cid})
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/complaints', methods=['GET'])
 def get_complaints():
-    try:
-        email = request.args.get('email')
-        dept = request.args.get('department')
-        conn = get_db()
-        
-        if email:
-            rows = conn.execute('SELECT * FROM complaints WHERE citizen_email=? ORDER BY created_at DESC', (email,)).fetchall()
-        elif dept:
-            rows = conn.execute('SELECT * FROM complaints WHERE LOWER(department) = LOWER(?) ORDER BY created_at DESC', (dept,)).fetchall()
-        else:
-            rows = conn.execute('SELECT * FROM complaints ORDER BY created_at DESC').fetchall()
-        
-        conn.close()
-        return jsonify([dict(row) for row in rows])
-    except Exception as e:
-        return jsonify([]), 500
+    email = request.args.get('email')
+    dept = request.args.get('department')
+    conn = get_db()
+    if email:
+        rows = conn.execute("SELECT * FROM complaints WHERE citizen_email=? ORDER BY created_at DESC", (email,)).fetchall()
+    elif dept:
+        rows = conn.execute("SELECT * FROM complaints WHERE department=? ORDER BY created_at DESC", (dept,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM complaints ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 @app.route('/api/complaints/update-status', methods=['POST'])
 def update_status():
-    try:
-        data = request.json
-        complaint_id = data.get('id')
-        new_status = data.get('status')
-        
-        if not complaint_id or not new_status:
-            return jsonify({'success': False, 'message': 'id and status required'})
-        
-        conn = get_db()
-        conn.execute('UPDATE complaints SET status=? WHERE id=?', (new_status, complaint_id))
-        conn.commit()
-        
-        complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (complaint_id,)).fetchone()
-        if complaint and new_status == 'resolved':
-            create_notification(complaint['citizen_email'], 'citizen', 
-                              f'Complaint Resolved - {complaint["complaint_id"]}', 
-                              f'Your complaint has been resolved by {complaint["department"]} department.',
-                              f'/citizen/dashboard?tab=my')
-        
-        conn.close()
-        
-        return jsonify({'success': True, 'message': 'Status updated!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-# ==============================================
-# API: DEPARTMENT
-# ==============================================
-
-@app.route('/api/department/register', methods=['POST'])
-def dept_register():
     data = request.json
-    dept_name = data.get('dept_name', '').strip()
-    officer_name = data.get('officer_name', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    mobile = data.get('mobile', '').strip()
-    city = data.get('city', '').strip()
-    
-    if not all([dept_name, officer_name, email, password]):
-        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
-    if len(password) < 6:
-        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
-    
     conn = get_db()
-    try:
-        conn.execute('''INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) 
-                       VALUES (?,?,?,?,?,?,0)''',
-                     (dept_name, officer_name, email, hash_password(password), mobile, city))
-        conn.commit()
-        return jsonify({'success': True, 'message': 'आवेदन भेज दिया! Admin verify करेगा।'})
-    except sqlite3.IntegrityError:
-        return jsonify({'success': False, 'message': 'Email पहले से रजिस्टर है'})
-    finally: 
-        conn.close()
+    conn.execute("UPDATE complaints SET status=? WHERE id=?", (data['status'], data['id']))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
+# ============== FEEDBACK ==============
+@app.route('/api/get-complaint-for-feedback', methods=['POST'])
+def get_complaint():
+    data = request.json
+    conn = get_db()
+    complaint = conn.execute("SELECT * FROM complaints WHERE complaint_id=? AND citizen_email=?", 
+                            (data['complaint_id'], data['email'])).fetchone()
+    if not complaint:
+        return jsonify({'success': False, 'message': 'Complaint not found!'})
+    existing = conn.execute("SELECT * FROM feedback WHERE complaint_id=?", (data['complaint_id'],)).fetchone()
+    conn.close()
+    if existing:
+        return jsonify({'success': False, 'message': 'Feedback already given!'})
+    return jsonify({'success': True, 'complaint_id': complaint['complaint_id'], 'department': complaint['department'], 'status': complaint['status']})
+
+@app.route('/api/submit-feedback', methods=['POST'])
+def submit_feedback():
+    data = request.json
+    conn = get_db()
+    conn.execute("INSERT INTO feedback (complaint_id, citizen_name, citizen_email, department, rating, message) VALUES (?,?,?,?,?,?)",
+                (data['complaint_id'], data['citizen_name'], data['citizen_email'], data['department'], data['rating'], data['message']))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': 'Feedback submitted!'})
+
+@app.route('/api/my-feedbacks', methods=['GET'])
+def my_feedbacks():
+    email = request.args.get('email')
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM feedback WHERE citizen_email=? ORDER BY created_at DESC", (email,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/dept-feedbacks', methods=['GET'])
+def dept_feedbacks():
+    dept = request.args.get('department')
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM feedback WHERE department=? ORDER BY created_at DESC", (dept,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/all-feedbacks', methods=['GET'])
+def all_feedbacks():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM feedback ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+# ============== NOTIFICATIONS ==============
+@app.route('/api/notifications', methods=['GET'])
+def notifications():
+    email = request.args.get('email')
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM notifications WHERE user_email=? ORDER BY created_at DESC LIMIT 30", (email,)).fetchall()
+    unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE user_email=? AND is_read=0", (email,)).fetchone()[0]
+    conn.close()
+    return jsonify({'notifications': [dict(r) for r in rows], 'unread_count': unread})
+
+@app.route('/api/notifications/mark-read', methods=['POST'])
+def mark_read():
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE notifications SET is_read=1 WHERE id=?", (data['notification_id'],))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/notifications/mark-all-read', methods=['POST'])
+def mark_all_read():
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE notifications SET is_read=1 WHERE user_email=?", (data['email'],))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# ============== DEPARTMENT ==============
 @app.route('/api/department/login', methods=['POST'])
 def dept_login():
     data = request.json
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    
     conn = get_db()
-    row = conn.execute('SELECT * FROM departments WHERE email=? AND password=?', 
-                       (email, hash_password(password))).fetchone()
+    row = conn.execute("SELECT * FROM departments WHERE email=? AND password=?", 
+                      (data['email'], hash_password(data['password']))).fetchone()
     conn.close()
-    
-    if not row:
-        return jsonify({'success': False, 'message': 'Email या पासवर्ड गलत है'})
-    if row['is_verified'] == 0:
-        return jsonify({'success': False, 'not_verified': True, 'message': '❌ अकाउंट Verify नहीं हुआ है।'})
-    
-    session['dept_logged_in'] = True
-    session['dept_email'] = row['email']
-    session['dept_name'] = row['dept_name']
-    
-    return jsonify({'success': True, 'dept_name': row['dept_name'], 'officer_name': row['officer_name'], 'email': row['email']})
+    if row:
+        session['dept_logged_in'] = True
+        return jsonify({'success': True, 'dept_name': row['dept_name'], 'officer_name': row['officer_name'], 'email': row['email']})
+    return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
-@app.route('/api/department/logout', methods=['POST'])
-def dept_logout():
-    session.pop('dept_logged_in', None)
-    session.pop('dept_email', None)
-    session.pop('dept_name', None)
-    return jsonify({'success': True, 'message': 'Logged out'})
-
-# ==============================================
-# API: ADMIN
-# ==============================================
-
+# ============== ADMIN ==============
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.json
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    
-    conn = get_db()
-    row = conn.execute('SELECT * FROM admins WHERE email = ? AND password = ?', 
-                       (email, hash_password(password))).fetchone()
-    conn.close()
-    
-    if row:
+    if data['email'] == 'admin@grievai.com' and data['password'] == 'admin123':
         session['admin_logged_in'] = True
-        session['admin_email'] = row['email']
-        return jsonify({'success': True, 'name': row['name'], 'role': row['role']})
-    return jsonify({'success': False, 'message': 'Admin credentials गलत हैं'})
-
-@app.route('/api/admin/logout', methods=['POST'])
-def admin_logout():
-    session.pop('admin_logged_in', None)
-    session.pop('admin_email', None)
-    return jsonify({'success': True, 'message': 'Logged out'})
+        return jsonify({'success': True, 'name': 'Super Admin', 'role': 'super_admin'})
+    return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
 @app.route('/api/admin/all-data', methods=['GET'])
 def admin_all_data():
-    try:
-        conn = get_db()
-        complaints = [dict(row) for row in conn.execute('SELECT * FROM complaints ORDER BY created_at DESC').fetchall()]
-        citizens = [dict(row) for row in conn.execute('SELECT id, name, email, mobile, city, is_verified FROM citizens ORDER BY created_at DESC').fetchall()]
-        departments = [dict(row) for row in conn.execute('SELECT * FROM departments ORDER BY id DESC').fetchall()]
-        admins = [dict(row) for row in conn.execute('SELECT id, name, email, role FROM admins ORDER BY created_at DESC').fetchall()]
-        conn.close()
-        return jsonify({'complaints': complaints, 'citizens': citizens, 'departments': departments, 'admins': admins})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    conn = get_db()
+    complaints = [dict(r) for r in conn.execute("SELECT * FROM complaints ORDER BY created_at DESC").fetchall()]
+    citizens = [dict(r) for r in conn.execute("SELECT id, name, email, mobile, city FROM citizens").fetchall()]
+    departments = [dict(r) for r in conn.execute("SELECT * FROM departments").fetchall()]
+    conn.close()
+    return jsonify({'complaints': complaints, 'citizens': citizens, 'departments': departments})
 
 @app.route('/api/admin/verify-dept/<int:did>', methods=['POST'])
 def verify_dept(did):
-    try:
-        action = request.json.get('action', 'approve')
-        conn = get_db()
-        if action == 'approve':
-            conn.execute('UPDATE departments SET is_verified=1 WHERE id=?', (did,))
-        else:
-            conn.execute('DELETE FROM departments WHERE id=?', (did,))
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    conn = get_db()
+    conn.execute("UPDATE departments SET is_verified=1 WHERE id=?", (did,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 @app.route('/api/admin/delete-complaint/<int:cid>', methods=['DELETE'])
 def delete_complaint(cid):
-    try:
-        conn = get_db()
-        conn.execute('DELETE FROM complaints WHERE id=?', (cid,))
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/create', methods=['POST'])
-def create_admin():
-    data = request.json
-    name = data.get('name', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    mobile = data.get('mobile', '').strip()
-    
-    if not all([name, email, password]):
-        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
-    if len(password) < 6:
-        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
-    
     conn = get_db()
-    try:
-        conn.execute('INSERT INTO admins (name, email, password, mobile, role) VALUES (?,?,?,?,?)',
-                     (name, email, hash_password(password), mobile, 'admin'))
-        conn.commit()
-        return jsonify({'success': True, 'message': f'✅ Admin {name} created!'})
-    except sqlite3.IntegrityError:
-        return jsonify({'success': False, 'message': '❌ Email already registered'})
-    finally:
-        conn.close()
-
-@app.route('/api/admin/delete/<int:aid>', methods=['DELETE'])
-def delete_admin(aid):
-    conn = get_db()
-    admin = conn.execute('SELECT * FROM admins WHERE id = ?', (aid,)).fetchone()
-    if admin and admin['role'] == 'super_admin':
-        conn.close()
-        return jsonify({'success': False, 'message': '❌ Cannot delete Super Admin'})
-    conn.execute('DELETE FROM admins WHERE id = ?', (aid,))
+    conn.execute("DELETE FROM complaints WHERE id=?", (cid,))
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'message': '✅ Admin deleted!'})
-
-# ==============================================
-# API: CHATBOT
-# ==============================================
+    return jsonify({'success': True})
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    data = request.json
-    message = data.get('message', '').strip()
-    
-    if not message:
-        return jsonify({'success': False, 'response': 'कृपया कुछ लिखें'})
-    
-    msg_lower = message.lower()
-    
-    if any(g in msg_lower for g in ['namaste', 'hello', 'hi', 'नमस्ते']):
-        response = "🙏 नमस्ते! मैं GrievAI सहायक हूं। आपकी कैसे मदद कर सकता हूं?"
-    elif any(w in msg_lower for w in ['shikayat', 'complaint', 'शिकायत']):
-        response = "📝 शिकायत दर्ज करने के लिए Citizen Portal में लॉगिन करें और 'नई शिकायत' टैब पर जाएं।"
-    elif any(w in msg_lower for w in ['help', 'मदद']):
-        response = "❓ मैं आपकी मदद कर सकता हूं:\n• शिकायत कैसे दर्ज करें?\n• विभागों के बारे में\n• पासवर्ड रीसेट\n• फीडबैक कैसे दें?"
-    else:
-        response = "🤔 मैं आपका प्रश्न समझ नहीं पाया। कृपया 'help' टाइप करें।"
-    
-    return jsonify({'success': True, 'response': response})
-
-# ==============================================
-# START SERVER
-# ==============================================
+    msg = request.json.get('message', '').lower()
+    if any(w in msg for w in ['namaste', 'hello', 'hi']):
+        return jsonify({'response': '🙏 नमस्ते! मैं GrievAI सहायक हूं।'})
+    if any(w in msg for w in ['shikayat', 'complaint']):
+        return jsonify({'response': '📝 Citizen Portal में लॉगिन करें और "नई शिकायत" पर क्लिक करें।'})
+    return jsonify({'response': '🤔 कृपया "help" टाइप करें।'})
 
 if __name__ == '__main__':
-    init_db()
     print("\n" + "=" * 50)
-    print("  🏛️ GRIEVAI PORTAL STARTED!")
+    print("  🏛️ GRIEVAI PORTAL READY!")
     print(f"  🌐 {BASE_URL}")
     print("  👑 Admin: admin@grievai.com / admin123")
     print("  👤 Citizen: test@citizen.com / test123")
