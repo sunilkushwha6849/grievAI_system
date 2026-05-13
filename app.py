@@ -157,13 +157,17 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     print("✓ complaints table ready")
     
+    # NEW FEEDBACK TABLE
     c.execute('''CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_name TEXT, 
-        user_type TEXT DEFAULT 'citizen',
-        rating INTEGER, 
+        complaint_id TEXT NOT NULL,
+        citizen_name TEXT NOT NULL,
+        citizen_email TEXT NOT NULL,
+        department TEXT NOT NULL,
+        rating INTEGER DEFAULT 0,
         message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
     print("✓ feedback table ready")
     
     c.execute('''CREATE TABLE IF NOT EXISTS admins (
@@ -215,6 +219,19 @@ def init_db():
         print("✓ Test citizen added: test@citizen.com / test123")
     except:
         pass
+    
+    # Sample complaints
+    sample_complaints = [
+        ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Test complaint 1', 'Water Supply', 'resolved', None, None, None, None, None, 'Bhopal'),
+    ]
+    
+    for s in sample_complaints:
+        try:
+            c.execute('''INSERT OR IGNORE INTO complaints 
+                (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, photo_path, voice_path, latitude, longitude, address, city) 
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', s)
+        except:
+            pass
     
     conn.commit()
     conn.close()
@@ -272,7 +289,6 @@ def send_otp():
     if not email:
         return jsonify({'success': False, 'message': 'Email is required'})
     
-    # Check if email already exists and verified
     conn = get_db()
     existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
     
@@ -282,7 +298,6 @@ def send_otp():
     
     conn.close()
     
-    # Generate OTP - even if email not registered yet
     otp = generate_otp()
     OTP_STORE[email] = {
         'otp': otp,
@@ -322,7 +337,6 @@ def verify_otp():
     if stored['otp'] != otp:
         return jsonify({'success': False, 'message': 'Invalid OTP!'})
     
-    # OTP is valid - don't mark verified yet, just return success
     return jsonify({'success': True, 'message': 'OTP verified! You can now complete registration.'})
 
 # ==============================================
@@ -347,7 +361,6 @@ def citizen_register():
     
     conn = get_db()
     
-    # Check if email already exists
     existing = conn.execute('SELECT * FROM citizens WHERE email = ?', (email,)).fetchone()
     
     if existing:
@@ -355,12 +368,10 @@ def citizen_register():
             conn.close()
             return jsonify({'success': False, 'message': 'Email already registered and verified!'})
         else:
-            # Update existing unverified user
             conn.execute('''UPDATE citizens SET name=?, mobile=?, password=?, city=?, is_verified=1 
                            WHERE email=?''', (name, mobile, hash_password(password), city, email))
             print(f"🔄 Updated and verified user: {email}")
     else:
-        # Insert new verified user (OTP already verified before this call)
         conn.execute('''INSERT INTO citizens (name, email, mobile, password, city, is_verified) 
                        VALUES (?,?,?,?,?,1)''',
                      (name, email, mobile, hash_password(password), city))
@@ -730,18 +741,137 @@ def delete_admin(aid):
     return jsonify({'success': True, 'message': '✅ Admin deleted!'})
 
 # ==============================================
-# API: FEEDBACK
+# API: FEEDBACK (NEW SYSTEM)
 # ==============================================
 
-@app.route('/api/feedback', methods=['POST'])
-def submit_feedback():
+# 1. GET COMPLAINT FOR FEEDBACK
+@app.route('/api/get-complaint-for-feedback', methods=['POST'])
+def get_complaint_for_feedback():
     data = request.json
+    complaint_id = data.get('complaint_id', '').strip().upper()
+    email = data.get('email', '').strip().lower()
+    
     conn = get_db()
-    conn.execute('INSERT INTO feedback (user_name, user_type, rating, message) VALUES (?,?,?,?)',
-                 (data.get('user_name', ''), data.get('user_type', 'citizen'), data.get('rating', 5), data.get('message', '')))
+    complaint = conn.execute('''SELECT * FROM complaints 
+                                WHERE complaint_id = ? AND citizen_email = ?''', 
+                                (complaint_id, email)).fetchone()
+    conn.close()
+    
+    if not complaint:
+        return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
+    
+    # Check if feedback already given
+    conn = get_db()
+    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
+    conn.close()
+    
+    if existing:
+        return jsonify({'success': False, 'message': 'Feedback already submitted for this complaint!'})
+    
+    return jsonify({
+        'success': True,
+        'complaint_id': complaint['complaint_id'],
+        'department': complaint['department'],
+        'status': complaint['status'],
+        'date': complaint['created_at'][:10] if complaint['created_at'] else 'N/A'
+    })
+
+# 2. SUBMIT FEEDBACK FOR COMPLAINT
+@app.route('/api/submit-feedback', methods=['POST'])
+def submit_complaint_feedback():
+    data = request.json
+    complaint_id = data.get('complaint_id', '').strip().upper()
+    citizen_email = data.get('citizen_email', '').strip().lower()
+    citizen_name = data.get('citizen_name', '')
+    department = data.get('department', '')
+    rating = data.get('rating', 0)
+    message = data.get('message', '').strip()
+    
+    if not complaint_id or not message:
+        return jsonify({'success': False, 'message': 'Complaint ID and feedback message required'})
+    
+    if rating < 1 or rating > 5:
+        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'})
+    
+    conn = get_db()
+    
+    # Verify complaint exists and belongs to user
+    complaint = conn.execute('SELECT * FROM complaints WHERE complaint_id = ? AND citizen_email = ?', 
+                            (complaint_id, citizen_email)).fetchone()
+    
+    if not complaint:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Complaint not found!'})
+    
+    # Check if feedback already exists
+    existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
+    
+    if existing:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Feedback already submitted!'})
+    
+    # Insert feedback
+    conn.execute('''INSERT INTO feedback 
+                    (complaint_id, citizen_name, citizen_email, department, rating, message) 
+                    VALUES (?,?,?,?,?,?)''',
+                 (complaint_id, citizen_name, citizen_email, department, rating, message))
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'message': 'फीडबैक दर्ज हो गया!'})
+    
+    return jsonify({'success': True, 'message': 'Feedback submitted successfully! Thank you!'})
+
+# 3. GET MY FEEDBACKS (Citizen)
+@app.route('/api/my-feedbacks', methods=['GET'])
+def get_my_feedbacks():
+    email = request.args.get('email', '').strip().lower()
+    
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
+                                FROM feedback f 
+                                JOIN complaints c ON f.complaint_id = c.complaint_id
+                                WHERE f.citizen_email = ? 
+                                ORDER BY f.created_at DESC''', (email,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(f) for f in feedbacks])
+
+# 4. GET DEPARTMENT FEEDBACKS
+@app.route('/api/dept-feedbacks', methods=['GET'])
+def get_dept_feedbacks():
+    dept = request.args.get('department', '').strip()
+    
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT * FROM feedback 
+                                WHERE department = ? 
+                                ORDER BY created_at DESC''', (dept,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(f) for f in feedbacks])
+
+# 5. GET ALL FEEDBACKS (Admin)
+@app.route('/api/all-feedbacks', methods=['GET'])
+def get_all_feedbacks():
+    conn = get_db()
+    feedbacks = conn.execute('''SELECT f.*, c.status as complaint_status 
+                                FROM feedback f 
+                                JOIN complaints c ON f.complaint_id = c.complaint_id
+                                ORDER BY f.created_at DESC''').fetchall()
+    
+    # Get department-wise stats
+    stats = conn.execute('''SELECT 
+                            department,
+                            COUNT(*) as total,
+                            AVG(rating) as avg_rating,
+                            SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as satisfied,
+                            SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as dissatisfied
+                            FROM feedback 
+                            GROUP BY department''').fetchall()
+    conn.close()
+    
+    return jsonify({
+        'feedbacks': [dict(f) for f in feedbacks],
+        'stats': [dict(s) for s in stats]
+    })
 
 # ==============================================
 # API: CHATBOT
