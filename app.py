@@ -31,7 +31,6 @@ def generate_complaint_id():
     return f"GRV{datetime.datetime.now().strftime('%y%m%d')}{''.join(random.choices('0123456789', k=4))}"
 
 def create_notification(user_email, user_type, title, message, link=''):
-    """Create notification for user"""
     try:
         conn = get_db()
         conn.execute('''INSERT INTO notifications (user_email, user_type, title, message, link, is_read, created_at) 
@@ -47,7 +46,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Drop and recreate for clean state (remove if you want to keep data)
     c.execute("DROP TABLE IF EXISTS citizens")
     c.execute("DROP TABLE IF EXISTS departments")
     c.execute("DROP TABLE IF EXISTS complaints")
@@ -133,15 +131,10 @@ def init_db():
     for d in default_depts:
         c.execute("INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,?)", d)
     
-    # Admin
     c.execute("INSERT INTO admins (name, email, password, role) VALUES (?,?,?,?)", 
               ('Super Admin', 'admin@grievai.com', hash_password('admin123'), 'super_admin'))
-    
-    # Test citizen
     c.execute("INSERT INTO citizens (name, email, mobile, password, city, is_verified) VALUES (?,?,?,?,?,?)",
               ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
-    
-    # Sample complaint for testing feedback
     c.execute("INSERT INTO complaints (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, city) VALUES (?,?,?,?,?,?,?,?)",
               ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Sample complaint for feedback', 'Water Supply', 'resolved', 'Bhopal'))
     
@@ -170,7 +163,7 @@ def faq_page(): return render_template('faq.html')
 @app.route('/instructions')
 def instructions_page(): return render_template('instructions.html')
 
-# ============== AUTH ==============
+# ============== REGISTER & LOGIN ==============
 @app.route('/api/citizen/register', methods=['POST'])
 def register():
     data = request.json
@@ -220,7 +213,7 @@ def change_password():
     conn.execute("UPDATE citizens SET password=? WHERE email=?", (hash_password(data['new_password']), data['email']))
     conn.commit()
     conn.close()
-    create_notification(data['email'], 'citizen', 'Password Changed', 'Your password has been updated successfully.')
+    create_notification(data['email'], 'citizen', 'Password Changed', 'Your password has been updated.')
     return jsonify({'success': True, 'message': 'Password changed!'})
 
 @app.route('/api/citizen/profile', methods=['GET'])
@@ -231,33 +224,46 @@ def profile():
     conn.close()
     return jsonify({'success': True, 'profile': dict(user)} if user else {'success': False})
 
-# ============== OTP ==============
-@app.route('/api/send-otp', methods=['POST'])
+# ============== OTP (For Password Reset & Registration) ==============
+@app.route('/api/otp/send', methods=['POST'])
 def send_otp():
     data = request.json
-    email = data.get('email')
+    email = data.get('target', data.get('email', ''))
     if not email:
         return jsonify({'success': False, 'message': 'Email required'})
     otp = ''.join(random.choices('0123456789', k=6))
     OTP_STORE[email] = {'otp': otp, 'expires': datetime.datetime.now() + datetime.timedelta(minutes=10)}
-    print(f"📧 OTP for {email}: {otp}")
+    print(f"\n📧 [OTP] {email} => {otp}\n")
     return jsonify({'success': True, 'otp': otp, 'message': 'OTP sent!'})
 
-@app.route('/api/verify-otp', methods=['POST'])
+@app.route('/api/otp/verify', methods=['POST'])
 def verify_otp():
     data = request.json
-    email = data.get('email')
-    otp = data.get('otp')
+    email = data.get('target', data.get('email', ''))
+    otp = data.get('otp', '')
     stored = OTP_STORE.get(email)
     if not stored:
-        return jsonify({'success': False, 'message': 'OTP not requested'})
+        return jsonify({'success': False, 'message': 'OTP not requested or expired'})
     if datetime.datetime.now() > stored['expires']:
         del OTP_STORE[email]
         return jsonify({'success': False, 'message': 'OTP expired'})
     if stored['otp'] != otp:
-        return jsonify({'success': False, 'message': 'Invalid OTP'})
+        return jsonify({'success': False, 'message': 'Wrong OTP'})
     del OTP_STORE[email]
     return jsonify({'success': True, 'message': 'OTP verified'})
+
+@app.route('/api/citizen/reset-password', methods=['POST'])
+def reset_password():
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    new_pass = data.get('new_password', '')
+    if len(new_pass) < 6:
+        return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
+    conn = get_db()
+    conn.execute("UPDATE citizens SET password=? WHERE email=?", (hash_password(new_pass), email))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': 'Password reset successful!'})
 
 # ============== COMPLAINTS ==============
 @app.route('/api/complaints', methods=['POST'])
@@ -296,20 +302,17 @@ def get_complaints():
 def update_status():
     data = request.json
     conn = get_db()
-    # Get complaint details before update
     complaint = conn.execute("SELECT * FROM complaints WHERE id=?", (data['id'],)).fetchone()
     if complaint and data['status'] == 'resolved' and complaint['status'] != 'resolved':
-        # Send notification to citizen
         create_notification(complaint['citizen_email'], 'citizen', 
                            f'Complaint Resolved - {complaint["complaint_id"]}', 
-                           f'Your complaint has been resolved by {complaint["department"]} department.',
-                           '/citizen/dashboard?tab=my')
+                           f'Resolved by {complaint["department"]} department.', '/citizen/dashboard?tab=my')
     conn.execute("UPDATE complaints SET status=? WHERE id=?", (data['status'], data['id']))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
 
-# ============== FEEDBACK (with Notifications) ==============
+# ============== FEEDBACK ==============
 @app.route('/api/get-complaint-for-feedback', methods=['POST'])
 def get_complaint():
     data = request.json
@@ -333,14 +336,10 @@ def submit_feedback():
                 (data['complaint_id'], data['citizen_name'], data['citizen_email'], data['department'], data['rating'], data['message']))
     conn.commit()
     conn.close()
-    
-    # Send notification to department
     create_notification(data['department'], 'department', 
-                       f'New Feedback Received - {data["complaint_id"]}', 
-                       f'Rating: {data["rating"]}/5\nMessage: {data["message"][:100]}',
-                       '/department/dashboard?tab=feedback')
-    
-    return jsonify({'success': True, 'message': 'Feedback submitted! Thank you!'})
+                       f'New Feedback - {data["complaint_id"]}', 
+                       f'Rating: {data["rating"]}/5 - {data["message"][:100]}', '/department/dashboard?tab=feedback')
+    return jsonify({'success': True, 'message': 'Feedback submitted!'})
 
 @app.route('/api/my-feedbacks', methods=['GET'])
 def my_feedbacks():
