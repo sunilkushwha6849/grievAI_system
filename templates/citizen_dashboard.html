@@ -216,7 +216,55 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
   <div id="tab-my" class="tab-content"><div class="form-card"><h3 style="margin-bottom:20px;">📋 मेरी शिकायतें</h3><div style="overflow-x:auto;"><table class="complaint-table"><thead><tr><th>ID</th><th>विभाग</th><th>शिकायत</th><th>स्टेटस</th><th>तारीख</th></tr></thead><tbody id="myComplaintsBody"><tr><td colspan="5" style="text-align:center; padding:20px;">लोड हो रहा है...</td></tr></tbody></table></div></div></div>
 
   <!-- FEEDBACK TAB -->
-  <div id="tab-feedback" class="tab-content"><div class="form-card"><h3 style="margin-bottom:20px;">⭐ फीडबैक दें</h3><div class="form-group"><label class="form-label">रेटिंग</label><div id="starRating" style="display:flex; gap:5px;"><span class="star" data-rating="1" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(1)">★</span><span class="star" data-rating="2" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(2)">★</span><span class="star" data-rating="3" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(3)">★</span><span class="star" data-rating="4" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(4)">★</span><span class="star" data-rating="5" style="font-size:30px; cursor:pointer; color:#CBD5E0;" onclick="setRating(5)">★</span></div></div><div class="form-group"><label class="form-label">💬 आपकी राय</label><textarea id="feedbackMsg" class="form-control" rows="4" placeholder="अपनी राय लिखें..."></textarea></div><button class="submit-btn" onclick="submitFeedback()" style="background:#6B3FA0;">📨 फीडबैक सबमिट करें</button></div></div>
+<!-- FEEDBACK TAB - WITH COMPLAINT ID -->
+<div id="tab-feedback" class="tab-content">
+  <div class="form-card">
+    <h3 style="margin-bottom:20px; color:#6B3FA0;">⭐ अपनी शिकायत पर फीडबैक दें</h3>
+    
+    <!-- Step 1: Enter Complaint ID -->
+    <div id="feedbackStep1">
+      <div class="form-group">
+        <label class="form-label">🆔 Complaint ID <span class="required">*</span></label>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <input type="text" id="feedbackComplaintId" class="form-control" placeholder="जैसे: GRV241201001" style="flex: 2; min-width: 200px;">
+          <button class="btn-primary" onclick="fetchComplaintForFeedback()" style="background:#1B8A4E; padding: 12px 25px; border-radius: 8px;">🔍 Get Complaint</button>
+        </div>
+        <div id="complaintInfo" style="margin-top: 10px; display: none; padding: 12px; background: #E8F5E9; border-radius: 8px; border-left: 4px solid #1B8A4E;"></div>
+        <div id="complaintError" style="margin-top: 10px; display: none; padding: 12px; background: #FEE2E2; border-radius: 8px; border-left: 4px solid #C0392B; color: #C0392B;"></div>
+      </div>
+    </div>
+    
+    <!-- Step 2: Give Feedback -->
+    <div id="feedbackStep2" style="display: none;">
+      <div class="form-group">
+        <label class="form-label">⭐ रेटिंग <span class="required">*</span></label>
+        <div id="feedbackStarRating" style="display:flex; gap: 8px; margin-bottom: 5px;">
+          <span class="star" data-rating="1" onclick="setFeedbackRating(1)" style="font-size: 32px; cursor: pointer; color: #CBD5E0;">★</span>
+          <span class="star" data-rating="2" onclick="setFeedbackRating(2)" style="font-size: 32px; cursor: pointer; color: #CBD5E0;">★</span>
+          <span class="star" data-rating="3" onclick="setFeedbackRating(3)" style="font-size: 32px; cursor: pointer; color: #CBD5E0;">★</span>
+          <span class="star" data-rating="4" onclick="setFeedbackRating(4)" style="font-size: 32px; cursor: pointer; color: #CBD5E0;">★</span>
+          <span class="star" data-rating="5" onclick="setFeedbackRating(5)" style="font-size: 32px; cursor: pointer; color: #CBD5E0;">★</span>
+        </div>
+        <div id="ratingError" class="error-text" style="display: none;"></div>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">💬 आपकी राय / सुझाव <span class="required">*</span></label>
+        <textarea id="feedbackMessage" class="form-control" rows="4" placeholder="अपनी शिकायत के बारे में अपनी राय लिखें..."></textarea>
+        <div id="messageError" class="error-text" style="display: none;"></div>
+      </div>
+      
+      <button class="submit-btn" onclick="submitComplaintFeedback()" style="background: linear-gradient(90deg,#6B3FA0,#9B59B6);">📨 फीडबैक सबमिट करें</button>
+    </div>
+    
+    <!-- My Feedbacks List -->
+    <div style="margin-top: 35px;">
+      <h4 style="border-bottom: 2px solid #6B3FA0; padding-bottom: 8px; display: inline-block;">📋 मेरे फीडबैक</h4>
+      <div id="myFeedbacksList" style="margin-top: 15px;">
+        <div style="text-align:center; padding:30px; background:#f5f5f5; border-radius:10px;">⏳ लोड हो रहा है...</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Navigation Buttons - Left Corner Box -->
