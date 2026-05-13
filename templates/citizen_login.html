@@ -72,6 +72,9 @@
 }
 .register-btn-top:hover{ background: #FFB800; color: #2c2c2c; transform: scale(1.02); }
 .note-info{ background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-top: 15px; font-size: 11px; color: rgba(255,255,255,0.7); text-align: center; }
+.otp-box{ background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 10px; display: none; }
+.otp-box.show{ display: block; }
+.otp-code{ font-size: 28px; font-weight: bold; color: #1B8A4E; background: #fff; padding: 10px; border-radius: 8px; text-align: center; letter-spacing: 5px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -154,12 +157,26 @@
           <input type="password" id="confirmPassword" class="form-control" placeholder="पासवर्ड फिर लिखें" required>
         </div>
       </div>
-      <button type="button" class="btn-submit" onclick="doFullRegister()">✅ रजिस्टर करें</button>
+      
+      <!-- OTP Section -->
+      <div id="otpSection" class="otp-box">
+        <div class="form-group">
+          <label class="form-label">📱 OTP कोड</label>
+          <input type="text" id="otpInput" class="form-control" placeholder="6 अंकों का OTP दर्ज करें" maxlength="6">
+          <div id="otpMessage" style="font-size: 12px; margin-top: 5px;"></div>
+        </div>
+        <button type="button" class="btn-submit" onclick="verifyOTP()" style="background:#6B3FA0;">✅ Verify OTP & Register</button>
+        <button type="button" class="btn-sm" onclick="resendOTP()" style="background:#1A4FA0; margin-top: 10px; padding: 8px; width: 100%;">🔄 Resend OTP</button>
+      </div>
+      
+      <button type="button" class="btn-submit" id="sendOtpBtn" onclick="sendRegisterOTP()">📧 Send OTP & Register</button>
     </form>
   </div>
 </div>
 
 <script>
+let registerData = {};
+
 function showAlert(msg, type){
   const el = document.getElementById('alert-box');
   el.className = 'alert alert-'+type+' show';
@@ -170,6 +187,8 @@ function showAlert(msg, type){
 function openRegisterModal(){
   document.getElementById('registerModal').style.display = 'flex';
   document.getElementById('citizenRegisterForm').reset();
+  document.getElementById('otpSection').classList.remove('show');
+  document.getElementById('sendOtpBtn').style.display = 'block';
 }
 
 function closeRegisterModal(){
@@ -200,7 +219,7 @@ async function doLogin(){
   }
 }
 
-async function doFullRegister(){
+async function sendRegisterOTP(){
   const firstName = document.getElementById('firstName').value.trim();
   const lastName = document.getElementById('lastName').value.trim();
   const fullName = document.getElementById('fullName').value.trim();
@@ -222,26 +241,21 @@ async function doFullRegister(){
   if(password.length < 6){ showAlert('❌ पासवर्ड कम से कम 6 कैरेक्टर', 'danger'); return; }
   if(password !== confirmPass){ showAlert('❌ पासवर्ड मेल नहीं खाते', 'danger'); return; }
   
-  showAlert('⏳ Registering...', 'info');
+  registerData = { name: fullName, email: email, mobile: mobile, password: password, city: city };
+  
+  showAlert('⏳ Sending OTP...', 'info');
   try {
-    const response = await fetch('/api/citizen/register', {
+    const response = await fetch('/api/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: fullName,
-        email: email,
-        mobile: mobile,
-        password: password,
-        city: city
-      })
+      body: JSON.stringify({ email: email })
     });
     const data = await response.json();
     if(data.success){
-      showAlert('✅ ' + data.message, 'success');
-      closeRegisterModal();
-      document.getElementById('l-email').value = email;
-      document.getElementById('l-pass').value = '';
-      showAlert('✅ Registration successful! Now login with your password.', 'success');
+      document.getElementById('otpSection').classList.add('show');
+      document.getElementById('sendOtpBtn').style.display = 'none';
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP भेजा गया! DEMO OTP: <strong style="font-size: 24px;">${data.otp}</strong></span>`;
+      showAlert('✅ OTP sent! Enter OTP to complete registration.', 'success');
     } else {
       showAlert('❌ ' + data.message, 'danger');
     }
@@ -250,7 +264,69 @@ async function doFullRegister(){
   }
 }
 
-// Load chatbot
+async function resendOTP(){
+  showAlert('⏳ Resending OTP...', 'info');
+  try {
+    const response = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: registerData.email })
+    });
+    const data = await response.json();
+    if(data.success){
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #1B8A4E;">✅ OTP पुनः भेजा गया! DEMO OTP: <strong style="font-size: 24px;">${data.otp}</strong></span>`;
+      showAlert('✅ OTP resent!', 'success');
+    } else {
+      showAlert('❌ ' + data.message, 'danger');
+    }
+  } catch(error){
+    showAlert('❌ Network error: ' + error.message, 'danger');
+  }
+}
+
+async function verifyOTP(){
+  const otp = document.getElementById('otpInput').value.trim();
+  if(!otp || otp.length !== 6){
+    showAlert('❌ 6 अंकों का OTP दर्ज करें', 'danger');
+    return;
+  }
+  
+  showAlert('⏳ Verifying OTP...', 'info');
+  try {
+    const verifyResponse = await fetch('/api/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: registerData.email, otp: otp })
+    });
+    const verifyData = await verifyResponse.json();
+    if(!verifyData.success){
+      document.getElementById('otpMessage').innerHTML = `<span style="color: #C0392B;">❌ ${verifyData.message}</span>`;
+      showAlert('❌ ' + verifyData.message, 'danger');
+      return;
+    }
+    
+    // Register user
+    const registerResponse = await fetch('/api/citizen/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registerData)
+    });
+    const registerDataRes = await registerResponse.json();
+    
+    if(registerDataRes.success){
+      showAlert('✅ ' + registerDataRes.message, 'success');
+      closeRegisterModal();
+      document.getElementById('l-email').value = registerData.email;
+      document.getElementById('l-pass').value = '';
+      showAlert('✅ Registration successful! Please login with your password.', 'success');
+    } else {
+      showAlert('❌ ' + registerDataRes.message, 'danger');
+    }
+  } catch(error){
+    showAlert('❌ Network error: ' + error.message, 'danger');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   if(typeof initChatbot === 'function') {
     initChatbot('guest', 'guest', '');
