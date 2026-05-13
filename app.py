@@ -34,7 +34,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Drop all tables to recreate
     c.execute("DROP TABLE IF EXISTS citizens")
     c.execute("DROP TABLE IF EXISTS departments")
     c.execute("DROP TABLE IF EXISTS complaints")
@@ -42,7 +41,6 @@ def init_db():
     c.execute("DROP TABLE IF EXISTS notifications")
     c.execute("DROP TABLE IF EXISTS admins")
     
-    # Create citizens table
     c.execute('''CREATE TABLE citizens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL, 
@@ -53,7 +51,6 @@ def init_db():
         is_verified INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Create departments table with correct columns
     c.execute('''CREATE TABLE departments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dept_name TEXT NOT NULL, 
@@ -65,7 +62,6 @@ def init_db():
         is_verified INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Create complaints table
     c.execute('''CREATE TABLE complaints (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         complaint_id TEXT UNIQUE NOT NULL,
@@ -83,7 +79,6 @@ def init_db():
         city TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Create feedback table
     c.execute('''CREATE TABLE feedback (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         complaint_id TEXT NOT NULL,
@@ -94,7 +89,6 @@ def init_db():
         message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Create notifications table
     c.execute('''CREATE TABLE notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT NOT NULL,
@@ -105,7 +99,6 @@ def init_db():
         is_read INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Create admins table
     c.execute('''CREATE TABLE admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -115,7 +108,7 @@ def init_db():
         role TEXT DEFAULT 'admin',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Insert default departments
+    # Default departments
     default_depts = [
         ('Water Supply','Ramesh Sharma','water@grievai.com',hash_password('WaterSupply123'),'9876543201','Bhopal',1),
         ('Electricity','Suresh Verma','electricity@grievai.com',hash_password('Electricity123'),'9876543202','Bhopal',1),
@@ -124,23 +117,22 @@ def init_db():
         ('Healthcare','Rakesh Singh','healthcare@grievai.com',hash_password('Healthcare123'),'9876543205','Bhopal',1),
     ]
     for d in default_depts:
-        c.execute('INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,?)', d)
+        c.execute("INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,?)", d)
     
-    # Insert admin
+    # Admin
     c.execute("INSERT INTO admins (name, email, password, role) VALUES (?,?,?,?)", 
               ('Super Admin', 'admin@grievai.com', hash_password('admin123'), 'super_admin'))
     
-    # Insert test citizen
+    # Test citizen
     c.execute("INSERT INTO citizens (name, email, mobile, password, city, is_verified) VALUES (?,?,?,?,?,?)",
               ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
     
     conn.commit()
     conn.close()
-    print("✅ Database created successfully!")
+    print("✅ Database ready!")
 
 init_db()
 
-# ============== PAGES ==============
 @app.route('/')
 def index(): return render_template('index.html')
 @app.route('/citizen')
@@ -160,19 +152,30 @@ def faq_page(): return render_template('faq.html')
 @app.route('/instructions')
 def instructions_page(): return render_template('instructions.html')
 
-# ============== AUTH ==============
+# ============== REGISTER (FIXED) ==============
 @app.route('/api/citizen/register', methods=['POST'])
 def register():
     data = request.json
+    print(f"📝 Register: {data.get('email')}")
+    
+    if not data.get('name') or not data.get('email') or not data.get('mobile') or not data.get('password'):
+        return jsonify({'success': False, 'message': 'सभी फील्ड भरें'})
+    if len(data['password']) < 6:
+        return jsonify({'success': False, 'message': 'पासवर्ड 6+ कैरेक्टर'})
+    if len(data['mobile']) != 10 or not data['mobile'].isdigit():
+        return jsonify({'success': False, 'message': 'मोबाइल नंबर 10 अंकों का होना चाहिए'})
+    
+    conn = get_db()
     try:
-        conn = get_db()
         conn.execute("INSERT INTO citizens (name, email, mobile, password, city, is_verified) VALUES (?,?,?,?,?,1)",
-                    (data['name'], data['email'], data['mobile'], hash_password(data['password']), data.get('city', '')))
+                    (data['name'], data['email'].lower(), data['mobile'], hash_password(data['password']), data.get('city', '')))
         conn.commit()
-        conn.close()
+        print(f"✅ Registered: {data['email']}")
         return jsonify({'success': True, 'message': 'Registration successful!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+    except sqlite3.IntegrityError:
+        return jsonify({'success': False, 'message': 'Email already registered!'})
+    finally:
+        conn.close()
 
 @app.route('/api/citizen/login', methods=['POST'])
 def login():
@@ -183,8 +186,6 @@ def login():
     conn.close()
     if row:
         session['citizen_logged_in'] = True
-        session['citizen_email'] = row['email']
-        session['citizen_name'] = row['name']
         return jsonify({'success': True, 'name': row['name'], 'email': row['email'], 'mobile': row['mobile'], 'city': row['city'] or ''})
     return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
@@ -193,7 +194,6 @@ def logout():
     session.clear()
     return jsonify({'success': True})
 
-# ============== PROFILE ==============
 @app.route('/api/citizen/change-password', methods=['POST'])
 def change_password():
     data = request.json
@@ -214,11 +214,8 @@ def profile():
     conn = get_db()
     user = conn.execute("SELECT name, email, mobile, city FROM citizens WHERE email=?", (email,)).fetchone()
     conn.close()
-    if user:
-        return jsonify({'success': True, 'profile': dict(user)})
-    return jsonify({'success': False})
+    return jsonify({'success': True, 'profile': dict(user)} if user else {'success': False})
 
-# ============== COMPLAINTS ==============
 @app.route('/api/complaints', methods=['POST'])
 def file_complaint():
     try:
@@ -233,7 +230,7 @@ def file_complaint():
              request.form.get('city', '')))
         conn.commit()
         conn.close()
-        return jsonify({'success': True, 'complaint_id': cid, 'message': 'शिकायत दर्ज हो गई!'})
+        return jsonify({'success': True, 'complaint_id': cid})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
@@ -260,7 +257,6 @@ def update_status():
     conn.close()
     return jsonify({'success': True})
 
-# ============== FEEDBACK ==============
 @app.route('/api/get-complaint-for-feedback', methods=['POST'])
 def get_complaint():
     data = request.json
@@ -284,7 +280,7 @@ def submit_feedback():
                 (data['complaint_id'], data['citizen_name'], data['citizen_email'], data['department'], data['rating'], data['message']))
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'message': 'Feedback submitted! Thank you!'})
+    return jsonify({'success': True, 'message': 'Feedback submitted!'})
 
 @app.route('/api/my-feedbacks', methods=['GET'])
 def my_feedbacks():
@@ -309,7 +305,6 @@ def all_feedbacks():
     conn.close()
     return jsonify([dict(r) for r in rows])
 
-# ============== NOTIFICATIONS ==============
 @app.route('/api/notifications', methods=['GET'])
 def notifications():
     email = request.args.get('email')
@@ -337,7 +332,6 @@ def mark_all_read():
     conn.close()
     return jsonify({'success': True})
 
-# ============== DEPARTMENT ==============
 @app.route('/api/department/login', methods=['POST'])
 def dept_login():
     data = request.json
@@ -346,7 +340,6 @@ def dept_login():
                       (data['email'], hash_password(data['password']))).fetchone()
     conn.close()
     if row:
-        session['dept_logged_in'] = True
         return jsonify({'success': True, 'dept_name': row['dept_name'], 'officer_name': row['officer_name'], 'email': row['email']})
     return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
@@ -358,12 +351,12 @@ def dept_register():
         conn.execute("INSERT INTO departments (dept_name, officer_name, email, password, mobile, city, is_verified) VALUES (?,?,?,?,?,?,0)",
                     (data['dept_name'], data['officer_name'], data['email'], hash_password(data['password']), data.get('mobile',''), data.get('city','')))
         conn.commit()
-        conn.close()
-        return jsonify({'success': True, 'message': 'Application submitted! Admin will verify.'})
+        return jsonify({'success': True, 'message': 'Application submitted!'})
     except:
-        return jsonify({'success': False, 'message': 'Email already exists!'})
+        return jsonify({'success': False, 'message': 'Email exists!'})
+    finally:
+        conn.close()
 
-# ============== ADMIN ==============
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.json
@@ -372,7 +365,6 @@ def admin_login():
                       (data['email'], hash_password(data['password']))).fetchone()
     conn.close()
     if row:
-        session['admin_logged_in'] = True
         return jsonify({'success': True, 'name': row['name'], 'role': row['role']})
     return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
@@ -410,10 +402,11 @@ def create_admin():
         conn.execute("INSERT INTO admins (name, email, password, mobile, role) VALUES (?,?,?,?,?)",
                     (data['name'], data['email'], hash_password(data['password']), data.get('mobile',''), 'admin'))
         conn.commit()
-        conn.close()
-        return jsonify({'success': True, 'message': 'Admin created!'})
+        return jsonify({'success': True})
     except:
-        return jsonify({'success': False, 'message': 'Email already exists!'})
+        return jsonify({'success': False})
+    finally:
+        conn.close()
 
 @app.route('/api/admin/delete/<int:aid>', methods=['DELETE'])
 def delete_admin(aid):
@@ -427,25 +420,21 @@ def delete_admin(aid):
     conn.close()
     return jsonify({'success': True})
 
-# ============== CHATBOT ==============
 @app.route('/api/chat', methods=['POST'])
 def chat():
     msg = request.json.get('message', '').lower()
     if any(w in msg for w in ['namaste', 'hello', 'hi']):
-        return jsonify({'response': '🙏 नमस्ते! मैं GrievAI सहायक हूं। आपकी कैसे मदद कर सकता हूं?'})
+        return jsonify({'response': '🙏 नमस्ते! मैं GrievAI सहायक हूं।'})
     if any(w in msg for w in ['shikayat', 'complaint']):
         return jsonify({'response': '📝 Citizen Portal में लॉगिन करें और "नई शिकायत" टैब पर जाएं।'})
-    if any(w in msg for w in ['help', 'मदद']):
-        return jsonify({'response': '❓ मैं आपकी मदद कर सकता हूं: शिकायत कैसे दर्ज करें, स्टेटस कैसे देखें, पासवर्ड कैसे रीसेट करें?'})
     return jsonify({'response': '🤔 कृपया "help" टाइप करें।'})
 
-# ============== START ==============
 if __name__ == '__main__':
     print("\n" + "=" * 50)
     print("  🏛️ GRIEVAI PORTAL READY!")
     print(f"  🌐 {BASE_URL}")
     print("  👑 Admin: admin@grievai.com / admin123")
     print("  👤 Citizen: test@citizen.com / test123")
-    print("  🏢 Dept Water: water@grievai.com / WaterSupply123")
+    print("  🏢 Dept: water@grievai.com / WaterSupply123")
     print("=" * 50 + "\n")
     app.run(host='0.0.0.0', port=PORT)
