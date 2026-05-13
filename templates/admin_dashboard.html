@@ -16,6 +16,19 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 .create-admin-btn{background:#fff;color:#7B241C;border:none;padding:10px 20px;border-radius:50px;cursor:pointer;font-size:14px;font-weight:bold;display:flex;align-items:center;gap:8px;transition:all 0.2s;}
 .create-admin-btn:hover{background:#FFB800;color:#2c2c2c;transform:scale(1.02);}
 
+.notification-bell{position:relative;cursor:pointer;margin-right:15px;}
+.notification-bell .bell-icon{font-size:22px;}
+.notification-bell .badge{position:absolute;top:-8px;right:-8px;background:#C0392B;color:white;border-radius:50%;padding:2px 6px;font-size:10px;font-weight:bold;}
+.notification-dropdown{position:absolute;top:50px;right:0;width:320px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:1000;display:none;max-height:400px;overflow-y:auto;}
+.notification-dropdown.show{display:block;}
+.notification-item{padding:12px 15px;border-bottom:1px solid #eee;cursor:pointer;}
+.notification-item:hover{background:#f5f5f5;}
+.notification-item.unread{background:#E8F5E9;}
+.notification-title{font-weight:bold;font-size:14px;color:#333;}
+.notification-message{font-size:12px;color:#666;margin-top:3px;}
+.notification-time{font-size:10px;color:#999;margin-top:3px;}
+.mark-all-read{background:#1A4FA0;color:white;text-align:center;padding:8px;cursor:pointer;font-size:12px;}
+
 .dash-main{padding:25px;max-width:1400px;margin:0 auto;}
 
 .tabs{display:flex;gap:10px;margin-bottom:25px;border-bottom:2px solid #E2E8F0;padding-bottom:10px;flex-wrap:wrap;}
@@ -55,7 +68,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 .form-label .required{color:#C0392B;}
 .form-control{width:100%;padding:10px 12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:14px;}
 .form-control:focus{outline:none;border-color:#8E44AD;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:15px;}
 .btn-submit{width:100%;padding:12px;background:linear-gradient(90deg,#8E44AD,#9B59B6);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;margin-top:10px;}
 .btn-submit:hover{opacity:0.9;}
 
@@ -81,7 +93,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 .admin-role{font-size:10px;color:#9B59B6;}
 .btn-delete-admin{background:#C0392B;color:#fff;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-top:8px;}
 
-/* Feedback Styles */
 .feedback-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:20px;}
 .feedback-stat-card{background:#fff;border-radius:12px;padding:15px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.05);border:1px solid #eee;}
 .feedback-stat-card h3{font-size:14px;color:#666;margin-bottom:5px;}
@@ -90,7 +101,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 
 .feedback-item{background:#fff;border-radius:12px;padding:15px;margin-bottom:12px;border-left:4px solid #FFB800;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
 .feedback-stars{color:#FFB800;font-size:14px;}
-
 .department-feedback-group{margin-bottom:25px;}
 .dept-feedback-header{background:linear-gradient(135deg,#1A4FA0,#6B3FA0);color:#fff;padding:12px 15px;border-radius:10px;margin-bottom:10px;font-weight:bold;}
 
@@ -103,7 +113,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
   .dash-grid{grid-template-columns:1fr;}
   .full-width{grid-column:span 1;}
   .stats-mini-grid{grid-template-columns:repeat(2,1fr);}
-  .form-row{grid-template-columns:1fr;}
 }
 </style>
 </head>
@@ -112,6 +121,14 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 <div class="topbar">
   <div class="topbar-left"><span style="font-size:24px;">👑</span><div><div class="topbar-logo">Admin Panel</div><div class="topbar-sub">GrievAI – Full Control</div></div></div>
   <div class="topbar-right" style="display:flex; gap:15px; align-items:center;">
+    <div class="notification-bell" onclick="toggleNotifications()">
+      <span class="bell-icon">🔔</span>
+      <span class="badge" id="notificationBadge" style="display:none;">0</span>
+      <div class="notification-dropdown" id="notificationDropdown">
+        <div class="mark-all-read" onclick="markAllNotificationsRead()">✅ सभी पढ़े हुए मार्क करें</div>
+        <div id="notificationList">लोड हो रहा है...</div>
+      </div>
+    </div>
     <span id="adminName" style="margin-right:5px;"></span>
     <button class="create-admin-btn" onclick="openCreateAdminModal()">➕ नया Admin बनाएं</button>
     <button class="btn-logout" onclick="logout()">🚪 लॉगआउट</button>
@@ -222,6 +239,43 @@ document.getElementById('adminName').innerHTML = '👑 ' + adminName;
 let allComplaints = [], allCitizens = [], allDepts = [], allAdmins = [];
 
 // ==============================================
+// NOTIFICATION FUNCTIONS
+// ==============================================
+
+async function loadAdminNotifications() {
+  try {
+    const response = await fetch('/api/notifications?email=admin@grievai.com&user_type=admin');
+    const data = await response.json();
+    const badge = document.getElementById('notificationBadge');
+    if(data.unread_count > 0){ badge.style.display = 'inline-block'; badge.innerText = data.unread_count; }
+    else{ badge.style.display = 'none'; }
+    const container = document.getElementById('notificationList');
+    if(!data.notifications || data.notifications.length === 0){ container.innerHTML = '<div style="padding:15px;text-align:center;">कोई नोटिफिकेशन नहीं</div>'; return; }
+    container.innerHTML = data.notifications.map(n => `
+      <div class="notification-item ${n.is_read == 0 ? 'unread' : ''}" onclick="markNotificationRead(${n.id})">
+        <div class="notification-title">${n.title}</div>
+        <div class="notification-message">${n.message}</div>
+        <div class="notification-time">${new Date(n.created_at).toLocaleString()}</div>
+      </div>
+    `).join('');
+  } catch(error){ console.error(error); }
+}
+
+async function markNotificationRead(id){
+  await fetch('/api/notifications/mark-read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notification_id:id, email:'admin@grievai.com'})});
+  loadAdminNotifications();
+}
+
+async function markAllNotificationsRead(){
+  await fetch('/api/notifications/mark-all-read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'admin@grievai.com',user_type:'admin'})});
+  loadAdminNotifications();
+}
+
+function toggleNotifications(){ document.getElementById('notificationDropdown').classList.toggle('show'); loadAdminNotifications(); }
+document.addEventListener('click', function(e){ if(!e.target.closest('.notification-bell')){ document.getElementById('notificationDropdown').classList.remove('show'); } });
+setInterval(loadAdminNotifications, 30000);
+
+// ==============================================
 // FEEDBACK FUNCTIONS
 // ==============================================
 
@@ -230,9 +284,8 @@ async function loadAdminFeedback() {
     const response = await fetch('/api/all-feedbacks');
     const data = await response.json();
     
-    // Stats
     const statsContainer = document.getElementById('feedbackStatsContainer');
-    if (data.stats && data.stats.length > 0) {
+    if(data.stats && data.stats.length > 0) {
       statsContainer.innerHTML = data.stats.map(s => `
         <div class="feedback-stat-card">
           <h3>🏛 ${s.department}</h3>
@@ -245,19 +298,14 @@ async function loadAdminFeedback() {
       statsContainer.innerHTML = '<div style="text-align:center; padding:20px;">📊 अभी तक कोई फीडबैक डेटा नहीं</div>';
     }
     
-    // Group feedbacks by department
     const container = document.getElementById('adminFeedbackList');
     if (!data.feedbacks || data.feedbacks.length === 0) {
       container.innerHTML = '<div style="text-align:center; padding:30px;">📭 कोई फीडबैक नहीं</div>';
       return;
     }
     
-    // Group by department
     const grouped = {};
-    data.feedbacks.forEach(f => {
-      if (!grouped[f.department]) grouped[f.department] = [];
-      grouped[f.department].push(f);
-    });
+    data.feedbacks.forEach(f => { if (!grouped[f.department]) grouped[f.department] = []; grouped[f.department].push(f); });
     
     let html = '';
     for (const [dept, feedbacks] of Object.entries(grouped)) {
@@ -276,10 +324,7 @@ async function loadAdminFeedback() {
       html += `</div>`;
     }
     container.innerHTML = html;
-  } catch (error) {
-    console.error('Error:', error);
-    document.getElementById('adminFeedbackList').innerHTML = '<div style="text-align:center; padding:30px; color:#C0392B;">❌ Error loading feedbacks</div>';
-  }
+  } catch (error) { console.error('Error:', error); }
 }
 
 // ==============================================
@@ -500,25 +545,13 @@ function switchTab(tab) {
   };
   
   const tabId = tabMap[tab];
-  if(tabId) {
-    document.getElementById(tabId).classList.add('active');
-    // Find the button that was clicked and add active class
-    const btns = document.querySelectorAll('.tab-btn');
-    for(let btn of btns) {
-      if(btn.textContent.includes(tab === 'overview' ? 'अवलोकन' : 
-         tab === 'departments' ? 'विभाग' :
-         tab === 'complaints' ? 'शिकायतें' :
-         tab === 'citizens' ? 'नागरिक' :
-         tab === 'admins' ? 'एडमिन' : 'फीडबैक')) {
-        btn.classList.add('active');
-        break;
-      }
-    }
-  }
+  if(tabId) { document.getElementById(tabId).classList.add('active'); }
   
-  if(tab === 'feedback') {
-    loadAdminFeedback();
-  }
+  const btnText = { 'overview':'अवलोकन', 'departments':'विभाग', 'complaints':'शिकायतें', 'citizens':'नागरिक', 'admins':'एडमिन', 'feedback':'फीडबैक' };
+  const btns = document.querySelectorAll('.tab-btn');
+  for(let btn of btns) { if(btn.textContent.includes(btnText[tab])){ btn.classList.add('active'); break; } }
+  
+  if(tab === 'feedback') { loadAdminFeedback(); }
 }
 
 function showAlert(msg, type){
@@ -532,6 +565,7 @@ function showAlert(msg, type){
 function logout(){ localStorage.removeItem('admin'); localStorage.removeItem('adminName'); window.location='/admin'; }
 
 loadAll();
+loadAdminFeedback();
 
 document.addEventListener('DOMContentLoaded', function() {
   if(typeof initChatbot === 'function') {
