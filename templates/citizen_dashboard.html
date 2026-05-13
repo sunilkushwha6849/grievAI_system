@@ -16,6 +16,20 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 
 .dash-main{padding:25px;max-width:800px;margin:0 auto;}
 
+/* Notification Bell */
+.notification-bell{position:relative;cursor:pointer;margin-right:15px;}
+.notification-bell .bell-icon{font-size:24px;}
+.notification-bell .badge{position:absolute;top:-8px;right:-8px;background:#C0392B;color:white;border-radius:50%;padding:2px 6px;font-size:10px;font-weight:bold;}
+.notification-dropdown{position:absolute;top:50px;right:0;width:320px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:1000;display:none;max-height:400px;overflow-y:auto;}
+.notification-dropdown.show{display:block;}
+.notification-item{padding:12px 15px;border-bottom:1px solid #eee;cursor:pointer;}
+.notification-item:hover{background:#f5f5f5;}
+.notification-item.unread{background:#E8F5E9;}
+.notification-title{font-weight:bold;font-size:14px;}
+.notification-message{font-size:12px;color:#666;margin-top:3px;}
+.notification-time{font-size:10px;color:#999;margin-top:3px;}
+.mark-all-read{background:#1A4FA0;color:white;text-align:center;padding:8px;cursor:pointer;font-size:12px;}
+
 .nav-box{
   position: fixed;
   bottom: 20px;
@@ -70,12 +84,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 .form-control{width:100%;padding:12px 15px;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;}
 .form-control:focus{outline:none;border-color:#1B8A4E;}
 .form-control.error{border-color:#C0392B;background:#FEE2E2;}
-.form-control[readonly]{background:#f5f5f5;color:#666;cursor:not-allowed;}
-
-.mobile-otp-row{display:flex;gap:10px;align-items:center;}
-.otp-btn{width:100%;background:#1B8A4E;color:#fff;border:none;padding:12px 15px;border-radius:12px;font-weight:bold;cursor:pointer;}
-.otp-status{font-size:12px;margin-top:5px;}
-.otp-status.success{color:#1B8A4E;}
 
 .media-options{display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap;}
 .media-btn{flex:1;padding:12px;border:2px solid #E2E8F0;background:#fff;border-radius:12px;cursor:pointer;font-size:14px;font-weight:bold;transition:all 0.2s;}
@@ -122,13 +130,36 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
 
 .feedback-card{background:#fff;border-radius:12px;padding:15px;margin-bottom:12px;border-left:4px solid #1B8A4E;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
 .feedback-stars{color:#FFB800;font-size:18px;}
+
+/* Profile Section */
+.profile-card{background:#fff;border-radius:20px;padding:25px;text-align:center;}
+.profile-avatar{width:100px;height:100px;background:linear-gradient(135deg,#1B8A4E,#0E6B6B);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:48px;color:white;}
+.profile-info{margin-bottom:15px;padding:10px;background:#f5f5f5;border-radius:10px;text-align:left;}
+.profile-info label{font-weight:bold;color:#666;display:block;font-size:12px;}
+.profile-info .value{font-size:16px;color:#333;margin-top:3px;}
+
+.change-password-form{margin-top:20px;padding-top:20px;border-top:1px solid #eee;}
+.change-password-form h4{margin-bottom:15px;color:#1A4FA0;}
+.password-input-group{position:relative;margin-bottom:15px;}
+.password-toggle{position:absolute;right:12px;top:12px;cursor:pointer;color:#666;}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="topbar-left"><span style="font-size:24px;">👤</span><div><div class="topbar-logo">Citizen Portal</div><div class="topbar-sub">GrievAI – मध्य प्रदेश</div></div></div>
-  <div class="topbar-right"><span id="userGreeting" style="margin-right:15px;"></span><button class="btn-logout" onclick="logout()">🚪 लॉगआउट</button></div>
+  <div class="topbar-right">
+    <div class="notification-bell" onclick="toggleNotifications()">
+      <span class="bell-icon">🔔</span>
+      <span class="badge" id="notificationBadge" style="display:none;">0</span>
+      <div class="notification-dropdown" id="notificationDropdown">
+        <div class="mark-all-read" onclick="markAllNotificationsRead()">✅ सभी पढ़े हुए मार्क करें</div>
+        <div id="notificationList">लोड हो रहा है...</div>
+      </div>
+    </div>
+    <span id="userGreeting" style="margin-right:15px;"></span>
+    <button class="btn-logout" onclick="logout()">🚪 लॉगआउट</button>
+  </div>
 </div>
 
 <div class="dash-main">
@@ -143,6 +174,7 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
     <button class="tab-btn active" onclick="switchTab('file')">📝 नई शिकायत</button>
     <button class="tab-btn" onclick="switchTab('my')">📋 मेरी शिकायतें</button>
     <button class="tab-btn" onclick="switchTab('feedback')">⭐ फीडबैक दें</button>
+    <button class="tab-btn" onclick="switchTab('profile')">👤 प्रोफाइल</button>
   </div>
 
   <!-- FILE COMPLAINT TAB -->
@@ -180,12 +212,11 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
   <!-- MY COMPLAINTS TAB -->
   <div id="tab-my" class="tab-content"><div class="form-card"><h3 style="margin-bottom:20px;">📋 मेरी शिकायतें</h3><div style="overflow-x:auto;"><table class="complaint-table"><thead><tr><th>ID</th><th>विभाग</th><th>शिकायत</th><th>स्टेटस</th><th>तारीख</th></tr></thead><tbody id="myComplaintsBody"><tr><td colspan="5" style="text-align:center; padding:20px;">लोड हो रहा है...</td></tr></tbody></table></div></div></div>
 
-  <!-- FEEDBACK TAB - NEW WITH COMPLAINT ID -->
+  <!-- FEEDBACK TAB -->
   <div id="tab-feedback" class="tab-content">
     <div class="form-card">
       <h3 style="margin-bottom:20px; color:#6B3FA0;">⭐ अपनी शिकायत पर फीडबैक दें</h3>
       
-      <!-- Step 1: Enter Complaint ID -->
       <div id="feedbackStep1">
         <div class="form-group">
           <label class="form-label">🆔 Complaint ID <span class="required">*</span></label>
@@ -198,7 +229,6 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
         </div>
       </div>
       
-      <!-- Step 2: Give Feedback -->
       <div id="feedbackStep2" style="display: none;">
         <div class="form-group">
           <label class="form-label">⭐ रेटिंग <span class="required">*</span></label>
@@ -221,16 +251,57 @@ body{background:#F4F6FB;font-family:'Segoe UI',Arial,sans-serif;}
         <button class="submit-btn" onclick="submitComplaintFeedback()" style="background: linear-gradient(90deg,#6B3FA0,#9B59B6);">📨 फीडबैक सबमिट करें</button>
       </div>
       
-      <!-- My Feedbacks List -->
       <div style="margin-top: 35px;">
         <h4 style="border-bottom: 2px solid #6B3FA0; padding-bottom: 8px; display: inline-block;">📋 मेरे फीडबैक</h4>
         <div id="myFeedbacksList" style="margin-top: 15px;"></div>
       </div>
     </div>
   </div>
+
+  <!-- PROFILE TAB -->
+  <div id="tab-profile" class="tab-content">
+    <div class="profile-card">
+      <div class="profile-avatar">👤</div>
+      <h3 id="profileName">Loading...</h3>
+      <p id="profileEmail" style="color:#666;"></p>
+      
+      <div class="profile-info">
+        <label>📱 मोबाइल नंबर</label>
+        <div class="value" id="profileMobile">-</div>
+      </div>
+      <div class="profile-info">
+        <label>🏙️ शहर / जिला</label>
+        <div class="value" id="profileCity">-</div>
+      </div>
+      <div class="profile-info">
+        <label>✅ वेरिफिकेशन स्टेटस</label>
+        <div class="value" id="profileVerified">-</div>
+      </div>
+      <div class="profile-info">
+        <label>📅 सदस्यता तिथि</label>
+        <div class="value" id="profileMemberSince">-</div>
+      </div>
+      
+      <div class="change-password-form">
+        <h4>🔑 पासवर्ड बदलें</h4>
+        <div class="password-input-group">
+          <input type="password" id="oldPassword" class="form-control" placeholder="वर्तमान पासवर्ड">
+          <span class="password-toggle" onclick="togglePassword('oldPassword')">👁️</span>
+        </div>
+        <div class="password-input-group">
+          <input type="password" id="newPassword" class="form-control" placeholder="नया पासवर्ड (6+ कैरेक्टर)">
+          <span class="password-toggle" onclick="togglePassword('newPassword')">👁️</span>
+        </div>
+        <div class="password-input-group">
+          <input type="password" id="confirmPassword" class="form-control" placeholder="नया पासवर्ड दोहराएं">
+          <span class="password-toggle" onclick="togglePassword('confirmPassword')">👁️</span>
+        </div>
+        <button class="submit-btn" onclick="changePassword()" style="background:#1A4FA0; margin-top:10px;">पासवर्ड बदलें</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Navigation Buttons -->
 <div class="nav-box">
   <button class="nav-btn home" onclick="goHome()">🏠 होम</button>
   <button class="nav-btn back" onclick="goBack()">◀ पीछे जाएं</button>
@@ -242,13 +313,14 @@ let citizen = null;
 try { citizen = JSON.parse(localStorage.getItem('citizen') || 'null'); } catch(e) { citizen = null; }
 if(!citizen) { window.location = '/citizen'; }
 
+let notificationCheckInterval = null;
+
 document.getElementById('userGreeting').innerHTML = 'नमस्ते, ' + (citizen.name || '');
 document.getElementById('fullName').value = citizen.name || '';
 
 function goHome(){ window.location.href = '/'; }
 function goBack(){ window.history.back(); }
 
-let selectedRating = 3;
 let selectedMedia = 'text';
 let locationData = { lat: null, lng: null, address: null };
 let mediaRecorder = null;
@@ -270,10 +342,7 @@ function setFeedbackRating(rating) {
 
 async function fetchComplaintForFeedback() {
   const complaintId = document.getElementById('feedbackComplaintId').value.trim().toUpperCase();
-  if (!complaintId) {
-    showAlert('❌ कृपया Complaint ID दर्ज करें', 'danger');
-    return;
-  }
+  if (!complaintId) { showAlert('❌ कृपया Complaint ID दर्ज करें', 'danger'); return; }
   
   showAlert('⏳ Checking complaint...', 'info');
   document.getElementById('complaintError').style.display = 'none';
@@ -309,23 +378,11 @@ async function fetchComplaintForFeedback() {
 }
 
 async function submitComplaintFeedback() {
-  if (!currentFeedbackComplaint) {
-    showAlert('❌ Please fetch complaint first!', 'danger');
-    return;
-  }
-  
-  if (feedbackRating === 0) {
-    document.getElementById('ratingError').innerHTML = '❌ कृपया रेटिंग दें';
-    document.getElementById('ratingError').style.display = 'block';
-    return;
-  }
+  if (!currentFeedbackComplaint) { showAlert('❌ Please fetch complaint first!', 'danger'); return; }
+  if (feedbackRating === 0) { document.getElementById('ratingError').innerHTML = '❌ कृपया रेटिंग दें'; document.getElementById('ratingError').style.display = 'block'; return; }
   
   const message = document.getElementById('feedbackMessage').value.trim();
-  if (!message) {
-    document.getElementById('messageError').innerHTML = '❌ कृपया अपनी राय लिखें';
-    document.getElementById('messageError').style.display = 'block';
-    return;
-  }
+  if (!message) { document.getElementById('messageError').innerHTML = '❌ कृपया अपनी राय लिखें'; document.getElementById('messageError').style.display = 'block'; return; }
   
   showAlert('⏳ Submitting feedback...', 'info');
   
@@ -351,32 +408,24 @@ async function submitComplaintFeedback() {
       document.getElementById('feedbackStep2').style.display = 'none';
       document.getElementById('feedbackMessage').value = '';
       setFeedbackRating(0);
-      document.querySelectorAll('#feedbackStarRating .star').forEach(star => {
-        star.style.color = '#CBD5E0';
-      });
+      document.querySelectorAll('#feedbackStarRating .star').forEach(star => { star.style.color = '#CBD5E0'; });
       loadMyFeedbacks();
-    } else {
-      showAlert('❌ ' + data.message, 'danger');
-    }
-  } catch (error) {
-    showAlert('❌ Network error: ' + error.message, 'danger');
-  }
+    } else { showAlert('❌ ' + data.message, 'danger'); }
+  } catch (error) { showAlert('❌ Network error: ' + error.message, 'danger'); }
 }
 
 async function loadMyFeedbacks() {
   try {
     const response = await fetch('/api/my-feedbacks?email=' + encodeURIComponent(citizen.email));
     const feedbacks = await response.json();
-    
     const container = document.getElementById('myFeedbacksList');
     if (!feedbacks || feedbacks.length === 0) {
       container.innerHTML = '<div style="text-align:center; padding:30px; background:#f5f5f5; border-radius:10px;">📭 अभी तक कोई फीडबैक नहीं दिया</div>';
       return;
     }
-    
     container.innerHTML = feedbacks.map(f => `
       <div class="feedback-card" style="border-left-color: ${f.rating >= 4 ? '#1B8A4E' : (f.rating >= 3 ? '#FFB800' : '#C0392B')};">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px;">
           <div><strong style="color: #1A4FA0;">🆔 ${f.complaint_id}</strong></div>
           <div class="feedback-stars">${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</div>
         </div>
@@ -387,19 +436,108 @@ async function loadMyFeedbacks() {
         </div>
       </div>
     `).join('');
-  } catch (error) {
-    console.error('Error loading feedbacks:', error);
-    document.getElementById('myFeedbacksList').innerHTML = '<div style="text-align:center; padding:30px; color:#C0392B;">❌ Error loading feedbacks</div>';
-  }
+  } catch (error) { console.error(error); }
 }
 
-function setRating(rating) {
-  selectedRating = rating;
-  document.querySelectorAll('#starRating .star').forEach(star => {
-    star.style.color = parseInt(star.getAttribute('data-rating')) <= rating ? '#FFB800' : '#CBD5E0';
-  });
+// Profile Functions
+async function loadProfile() {
+  try {
+    const response = await fetch('/api/citizen/profile?email=' + encodeURIComponent(citizen.email));
+    const data = await response.json();
+    if (data.success) {
+      document.getElementById('profileName').innerText = data.profile.name;
+      document.getElementById('profileEmail').innerHTML = `📧 ${data.profile.email}`;
+      document.getElementById('profileMobile').innerHTML = data.profile.mobile || '-';
+      document.getElementById('profileCity').innerHTML = data.profile.city || '-';
+      document.getElementById('profileVerified').innerHTML = data.profile.is_verified == 1 ? '✅ Verified' : '❌ Not Verified';
+      document.getElementById('profileMemberSince').innerHTML = data.profile.member_since;
+    }
+  } catch (error) { console.error(error); }
 }
-setRating(3);
+
+async function changePassword() {
+  const oldPass = document.getElementById('oldPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirmPass = document.getElementById('confirmPassword').value;
+  
+  if (!oldPass) { showAlert('❌ वर्तमान पासवर्ड दर्ज करें', 'danger'); return; }
+  if (!newPass || newPass.length < 6) { showAlert('❌ नया पासवर्ड कम से कम 6 कैरेक्टर का होना चाहिए', 'danger'); return; }
+  if (newPass !== confirmPass) { showAlert('❌ नया पासवर्ड और कन्फर्म पासवर्ड मेल नहीं खाते', 'danger'); return; }
+  
+  showAlert('⏳ पासवर्ड बदला जा रहा है...', 'info');
+  
+  try {
+    const response = await fetch('/api/citizen/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: citizen.email, old_password: oldPass, new_password: newPass })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showAlert('✅ ' + data.message, 'success');
+      document.getElementById('oldPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+      localStorage.setItem('citizen', JSON.stringify({...citizen, password: newPass}));
+    } else { showAlert('❌ ' + data.message, 'danger'); }
+  } catch (error) { showAlert('❌ Network error: ' + error.message, 'danger'); }
+}
+
+function togglePassword(fieldId) {
+  const field = document.getElementById(fieldId);
+  field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+// Notification Functions
+async function loadNotifications() {
+  try {
+    const response = await fetch('/api/notifications?email=' + encodeURIComponent(citizen.email) + '&user_type=citizen');
+    const data = await response.json();
+    const badge = document.getElementById('notificationBadge');
+    if (data.unread_count > 0) { badge.style.display = 'inline-block'; badge.innerText = data.unread_count; }
+    else { badge.style.display = 'none'; }
+    
+    const container = document.getElementById('notificationList');
+    if (!data.notifications || data.notifications.length === 0) {
+      container.innerHTML = '<div style="padding:15px;text-align:center;color:#999;">कोई नोटिफिकेशन नहीं</div>';
+      return;
+    }
+    container.innerHTML = data.notifications.map(n => `
+      <div class="notification-item ${n.is_read == 0 ? 'unread' : ''}" onclick="markNotificationRead(${n.id})">
+        <div class="notification-title">${n.title}</div>
+        <div class="notification-message">${n.message}</div>
+        <div class="notification-time">${new Date(n.created_at).toLocaleString()}</div>
+      </div>
+    `).join('');
+  } catch (error) { console.error(error); }
+}
+
+async function markNotificationRead(id) {
+  try {
+    await fetch('/api/notifications/mark-read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notification_id: id, email: citizen.email }) });
+    loadNotifications();
+  } catch (error) { console.error(error); }
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: citizen.email, user_type: 'citizen' }) });
+    loadNotifications();
+  } catch (error) { console.error(error); }
+}
+
+function toggleNotifications() {
+  const dropdown = document.getElementById('notificationDropdown');
+  dropdown.classList.toggle('show');
+  if (dropdown.classList.contains('show')) { loadNotifications(); }
+}
+
+// Close notification dropdown when clicking outside
+document.addEventListener('click', function(event) {
+  const bell = document.querySelector('.notification-bell');
+  const dropdown = document.getElementById('notificationDropdown');
+  if (bell && !bell.contains(event.target) && dropdown) { dropdown.classList.remove('show'); }
+});
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -415,6 +553,10 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-btn')[2].classList.add('active');
     document.getElementById('tab-feedback').classList.add('active');
     loadMyFeedbacks();
+  } else if(tab === 'profile') {
+    document.querySelectorAll('.tab-btn')[3].classList.add('active');
+    document.getElementById('tab-profile').classList.add('active');
+    loadProfile();
   }
 }
 
@@ -564,19 +706,12 @@ async function submitComplaint() {
   const city = document.getElementById('city').value.trim();
   const mobile = document.getElementById('mobile').value.trim();
   const dept = document.getElementById('deptSelect').value;
-  
   let complaintText = '';
-  
-  if(selectedMedia === 'text') {
-    complaintText = `[${city}] ${document.getElementById('complaintText').value.trim()}`;
-  } else if(selectedMedia === 'mic') {
-    complaintText = `[Voice Complaint] [${city}]`;
-  } else if(selectedMedia === 'photo') {
-    complaintText = `[Photo Complaint] [${city}]`;
-  }
+  if(selectedMedia === 'text') { complaintText = `[${city}] ${document.getElementById('complaintText').value.trim()}`; }
+  else if(selectedMedia === 'mic') { complaintText = `[Voice Complaint] [${city}]`; }
+  else if(selectedMedia === 'photo') { complaintText = `[Photo Complaint] [${city}]`; }
   
   showAlert('⏳ शिकायत दर्ज की जा रही है...', 'info');
-  
   const formData = new FormData();
   formData.append('citizen_name', name);
   formData.append('citizen_email', citizen.email);
@@ -587,19 +722,11 @@ async function submitComplaint() {
   formData.append('longitude', locationData.lng);
   formData.append('address', locationData.address);
   formData.append('city', city);
-  
-  if(selectedMedia === 'mic' && recordedBlob) {
-    formData.append('voice', recordedBlob, 'recording.webm');
-  }
-  if(selectedMedia === 'photo' && document.getElementById('photoInput').files[0]) {
-    formData.append('photo', document.getElementById('photoInput').files[0]);
-  }
+  if(selectedMedia === 'mic' && recordedBlob) { formData.append('voice', recordedBlob, 'recording.webm'); }
+  if(selectedMedia === 'photo' && document.getElementById('photoInput').files[0]) { formData.append('photo', document.getElementById('photoInput').files[0]); }
   
   try {
-    const response = await fetch('/api/complaints', {
-      method: 'POST',
-      body: formData
-    });
+    const response = await fetch('/api/complaints', { method: 'POST', body: formData });
     const data = await response.json();
     if(data.success) {
       showAlert(`✅ शिकायत दर्ज! ID: ${data.complaint_id}`, 'success');
@@ -638,24 +765,13 @@ async function loadMyComplaints() {
     const tbody = document.getElementById('myComplaintsBody');
     if(complaints.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">कोई शिकायत नहीं</td></tr>'; return; }
     tbody.innerHTML = complaints.map(c => `
-      <tr>
-        <td><strong>${c.complaint_id}</strong></td>
-        <td>${c.department}</td>
-        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.complaint_text}</td>
-        <td><span class="status-badge ${c.status === 'pending' ? 'status-pending' : 'status-resolved'}">${c.status === 'pending' ? '⏳ लंबित' : '✅ हल'}</span></td>
-        <td>${new Date(c.created_at).toLocaleDateString()}</td>
-      </tr>
-    `).join('');
+      <tr><td><strong>${c.complaint_id}</strong></td>
+      <td>${c.department}</td>
+      <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.complaint_text}</td>
+      <td><span class="status-badge ${c.status === 'pending' ? 'status-pending' : 'status-resolved'}">${c.status === 'pending' ? '⏳ लंबित' : '✅ हल'}</span></td>
+      <td>${new Date(c.created_at).toLocaleDateString()}</td>
+    </tr>`).join('');
   } catch(err) { console.error(err); }
-}
-
-async function submitFeedback() {
-  const msg = document.getElementById('feedbackMsg').value.trim();
-  if(!msg) { showAlert('❌ फीडबैक लिखें', 'danger'); return; }
-  const response = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name: citizen.name, rating: selectedRating, message: msg }) });
-  const data = await response.json();
-  if(data.success) { showAlert('✅ फीडबैक दर्ज!', 'success'); document.getElementById('feedbackMsg').value = ''; }
-  else { showAlert('❌ ' + data.message, 'danger'); }
 }
 
 function showAlert(msg, type) {
@@ -666,11 +782,16 @@ function showAlert(msg, type) {
   setTimeout(() => alertBox.style.display = 'none', 4000);
 }
 
-function logout() { localStorage.removeItem('citizen'); window.location = '/citizen'; }
+function logout() { 
+  localStorage.removeItem('citizen'); 
+  window.location = '/citizen'; 
+}
 
 selectMedia('text');
 loadMyComplaints();
 loadMyFeedbacks();
+loadNotifications();
+setInterval(loadNotifications, 30000);
 
 document.addEventListener('DOMContentLoaded', function() {
   if(typeof initChatbot === 'function') {
