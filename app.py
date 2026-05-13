@@ -107,7 +107,21 @@ def generate_complaint_id():
     return f"GRV{now.strftime('%y%m%d')}{rand}"
 
 # ==============================================
-# INIT DATABASE - FIXED WITH NEW FEEDBACK TABLE
+# NOTIFICATION FUNCTION
+# ==============================================
+
+def create_notification(user_email, user_type, title, message, link=''):
+    """Create a notification for user"""
+    conn = get_db()
+    conn.execute('''INSERT INTO notifications (user_email, user_type, title, message, link, is_read, created_at) 
+                   VALUES (?,?,?,?,?,0, CURRENT_TIMESTAMP)''',
+                (user_email, user_type, title, message, link))
+    conn.commit()
+    conn.close()
+    print(f"🔔 Notification created for {user_email}: {title}")
+
+# ==============================================
+# INIT DATABASE
 # ==============================================
 
 def init_db():
@@ -174,6 +188,19 @@ def init_db():
     )''')
     print("✓ New feedback table created")
     
+    # CREATE NOTIFICATIONS TABLE
+    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        user_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        link TEXT DEFAULT '',
+        is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    print("✓ notifications table ready")
+    
     c.execute('''CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -221,16 +248,6 @@ def init_db():
                      VALUES (?,?,?,?,?,?)''',
                   ('Test Citizen', 'test@citizen.com', '9999999999', hash_password('test123'), 'Bhopal', 1))
         print("✓ Test citizen added: test@citizen.com / test123")
-    except:
-        pass
-    
-    # Sample complaint for feedback testing
-    try:
-        c.execute('''INSERT OR IGNORE INTO complaints 
-            (complaint_id, citizen_name, citizen_email, mobile, complaint_text, department, status, city) 
-            VALUES (?,?,?,?,?,?,?,?)''',
-                  ('GRV241201001', 'Test Citizen', 'test@citizen.com', '9999999999', 'Test complaint for feedback', 'Water Supply', 'resolved', 'Bhopal'))
-        print("✓ Sample complaint added")
     except:
         pass
     
@@ -446,6 +463,127 @@ def citizen_reset():
     return jsonify({'success': True, 'message': 'पासवर्ड बदल गया!'})
 
 # ==============================================
+# API: CHANGE PASSWORD (PROFILE)
+# ==============================================
+
+@app.route('/api/citizen/change-password', methods=['POST'])
+def change_password():
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+    
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'message': 'New password must be at least 6 characters'})
+    
+    conn = get_db()
+    user = conn.execute('SELECT * FROM citizens WHERE email = ? AND password = ?', 
+                       (email, hash_password(old_password))).fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Current password is incorrect!'})
+    
+    conn.execute('UPDATE citizens SET password = ? WHERE email = ?', 
+                (hash_password(new_password), email))
+    conn.commit()
+    conn.close()
+    
+    # Create notification
+    create_notification(email, 'citizen', 'Password Changed', 'Your password has been changed successfully.')
+    
+    return jsonify({'success': True, 'message': 'Password changed successfully!'})
+
+# ==============================================
+# API: GET CITIZEN PROFILE
+# ==============================================
+
+@app.route('/api/citizen/profile', methods=['GET'])
+def get_citizen_profile():
+    email = request.args.get('email', '').strip().lower()
+    
+    conn = get_db()
+    user = conn.execute('SELECT id, name, email, mobile, city, is_verified, created_at FROM citizens WHERE email = ?', (email,)).fetchone()
+    conn.close()
+    
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'})
+    
+    return jsonify({
+        'success': True,
+        'profile': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'mobile': user['mobile'],
+            'city': user['city'],
+            'is_verified': user['is_verified'],
+            'member_since': user['created_at'][:10] if user['created_at'] else 'N/A'
+        }
+    })
+
+# ==============================================
+# API: GET NOTIFICATIONS
+# ==============================================
+
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    email = request.args.get('email', '').strip().lower()
+    user_type = request.args.get('user_type', 'citizen')
+    
+    conn = get_db()
+    notifications = conn.execute('''SELECT * FROM notifications 
+                                    WHERE user_email = ? AND user_type = ? 
+                                    ORDER BY created_at DESC LIMIT 50''',
+                                (email, user_type)).fetchall()
+    unread_count = conn.execute('''SELECT COUNT(*) FROM notifications 
+                                   WHERE user_email = ? AND user_type = ? AND is_read = 0''',
+                               (email, user_type)).fetchone()[0]
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'notifications': [dict(n) for n in notifications],
+        'unread_count': unread_count
+    })
+
+# ==============================================
+# API: MARK NOTIFICATION AS READ
+# ==============================================
+
+@app.route('/api/notifications/mark-read', methods=['POST'])
+def mark_notification_read():
+    data = request.json
+    notification_id = data.get('notification_id')
+    email = data.get('email', '').strip().lower()
+    
+    conn = get_db()
+    conn.execute('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_email = ?', 
+                (notification_id, email))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'Notification marked as read'})
+
+# ==============================================
+# API: MARK ALL NOTIFICATIONS AS READ
+# ==============================================
+
+@app.route('/api/notifications/mark-all-read', methods=['POST'])
+def mark_all_notifications_read():
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    user_type = data.get('user_type', 'citizen')
+    
+    conn = get_db()
+    conn.execute('UPDATE notifications SET is_read = 1 WHERE user_email = ? AND user_type = ?', 
+                (email, user_type))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'All notifications marked as read'})
+
+# ==============================================
 # API: OTP (for password reset)
 # ==============================================
 
@@ -575,6 +713,15 @@ def update_status():
         conn.execute('UPDATE complaints SET status=? WHERE id=?', (new_status, complaint_id))
         conn.commit()
         conn.close()
+        
+        # Get complaint details to send notification
+        complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (complaint_id,)).fetchone()
+        if complaint and new_status == 'resolved':
+            create_notification(complaint['citizen_email'], 'citizen', 
+                              f'Complaint Resolved - {complaint["complaint_id"]}', 
+                              f'Your complaint has been resolved by {complaint["department"]} department.',
+                              f'/citizen/dashboard?tab=my')
+        
         return jsonify({'success': True, 'message': 'Status updated!'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -745,7 +892,6 @@ def delete_admin(aid):
 # API: FEEDBACK (NEW SYSTEM)
 # ==============================================
 
-# 1. GET COMPLAINT FOR FEEDBACK
 @app.route('/api/get-complaint-for-feedback', methods=['POST'])
 def get_complaint_for_feedback():
     data = request.json
@@ -761,7 +907,6 @@ def get_complaint_for_feedback():
         conn.close()
         return jsonify({'success': False, 'message': 'Complaint ID not found or not yours!'})
     
-    # Check if feedback already given
     existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
     conn.close()
     
@@ -776,7 +921,6 @@ def get_complaint_for_feedback():
         'date': complaint['created_at'][:10] if complaint['created_at'] else 'N/A'
     })
 
-# 2. SUBMIT FEEDBACK FOR COMPLAINT
 @app.route('/api/submit-feedback', methods=['POST'])
 def submit_complaint_feedback():
     data = request.json
@@ -795,7 +939,6 @@ def submit_complaint_feedback():
     
     conn = get_db()
     
-    # Verify complaint exists and belongs to user
     complaint = conn.execute('SELECT * FROM complaints WHERE complaint_id = ? AND citizen_email = ?', 
                             (complaint_id, citizen_email)).fetchone()
     
@@ -803,14 +946,12 @@ def submit_complaint_feedback():
         conn.close()
         return jsonify({'success': False, 'message': 'Complaint not found!'})
     
-    # Check if feedback already exists
     existing = conn.execute('SELECT * FROM feedback WHERE complaint_id = ?', (complaint_id,)).fetchone()
     
     if existing:
         conn.close()
         return jsonify({'success': False, 'message': 'Feedback already submitted!'})
     
-    # Insert feedback
     conn.execute('''INSERT INTO feedback 
                     (complaint_id, citizen_name, citizen_email, department, rating, message) 
                     VALUES (?,?,?,?,?,?)''',
@@ -818,9 +959,13 @@ def submit_complaint_feedback():
     conn.commit()
     conn.close()
     
+    # Create notification for department
+    create_notification(department, 'department', 'New Feedback Received', 
+                       f'New feedback received for complaint {complaint_id} with rating {rating}/5',
+                       f'/department/dashboard?tab=feedback')
+    
     return jsonify({'success': True, 'message': 'Feedback submitted successfully! Thank you!'})
 
-# 3. GET MY FEEDBACKS (Citizen)
 @app.route('/api/my-feedbacks', methods=['GET'])
 def get_my_feedbacks():
     email = request.args.get('email', '').strip().lower()
@@ -835,7 +980,6 @@ def get_my_feedbacks():
     
     return jsonify([dict(f) for f in feedbacks])
 
-# 4. GET DEPARTMENT FEEDBACKS
 @app.route('/api/dept-feedbacks', methods=['GET'])
 def get_dept_feedbacks():
     dept = request.args.get('department', '').strip()
@@ -848,7 +992,6 @@ def get_dept_feedbacks():
     
     return jsonify([dict(f) for f in feedbacks])
 
-# 5. GET ALL FEEDBACKS (Admin)
 @app.route('/api/all-feedbacks', methods=['GET'])
 def get_all_feedbacks():
     conn = get_db()
@@ -857,7 +1000,6 @@ def get_all_feedbacks():
                                 JOIN complaints c ON f.complaint_id = c.complaint_id
                                 ORDER BY f.created_at DESC''').fetchall()
     
-    # Get department-wise stats
     stats = conn.execute('''SELECT 
                             department,
                             COUNT(*) as total,
